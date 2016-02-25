@@ -6,15 +6,15 @@ dnl values of the weights don’t matter, only their relative magnitudes.
 dnl
 dnl Use this template as follows:
 dnl
-dnl     m4 -Dname=name -Dtype=type -Dinputs=inputs [-Dweightout] weighted_mix.osl.m4
+dnl     m4 -Dname=«name» -Dtype=«type» -Dinputs=«inputs» [-Dweightout] weighted_mix.osl.m4
 dnl
-dnl where “name” is the name to give to the shader, “type” is the type
-dnl of the inputs and outputs, “inputs” is the positive integer number of
+dnl where «name» is the name to give to the shader, «type» is the type
+dnl of the inputs and output, «inputs» is the positive integer number of
 dnl inputs that the shader will mix, and -Dweightout indicates that you
 dnl also want an output for the summed input weights, for chaining multiple
 dnl mixers together.
 dnl
-dnl “type” can be any type that OSL allows the requisite arithmetic operations on,
+dnl «type» can be any type that OSL allows the requisite arithmetic operations on,
 dnl e.g. “float”, “color”, “point”. It can also be “closure color” to create
 dnl a mix shader.
 dnl
