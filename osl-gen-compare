@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+#+
+# This script generates an Open Shading Language shader that returns
+# as its output a copy of one of two inputs, depending on a comparison
+# between two other inputs. Invoke it as follows:
+#
+#     osl-gen-compare --comptype=«comptype» --seltype=«seltype» --name=«name» «op»
+#
+# Copyright 2016 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
+#-
+
+import sys
+import getopt
+
+ops = \
+    {
+        "eq" : "==",
+        "ne" : "!=",
+        "lt" : "<",
+        "le" : "<=",
+        "gt" : ">",
+        "ge" : ">=",
+    }
+
+opts, args = getopt.getopt \
+  (
+    sys.argv[1:],
+    "",
+    ["comptype=", "name=", "seltype="]
+  )
+comptype = None
+seltype = None
+name = None
+for keyword, value in opts :
+    if keyword == "--comptype" :
+        comptype = value
+    elif keyword == "--name" :
+        name = value
+    elif keyword == "--seltype" :
+        seltype = value
+    #end if
+#end for
+if comptype == None or name == None or seltype == None :
+    raise getopt.GetoptError("missing --comptype, --name or --seltype value")
+#end if
+if len(args) != 1 :
+    raise getopt.GetoptError("need exactly one arg, the comparison operator")
+#end if
+op = args[0]
+if op not in ops :
+    raise getopt.GetoptError("op not one of {}".format(",".join(k for k in ops)))
+#end if
+is_closure = seltype.startswith("closure")
+
+sys.stdout.write \
+  (
+    "shader {name}\n"
+    "  (\n"
+    "    {comptype} Cmp1 = {comptype}(0),\n"
+    "    {comptype} Cmp2 = {comptype}(0),\n"
+    "    {seltype} Arg1 = {seldefault},\n"
+    "    {seltype} Arg2 = {seldefault},\n"
+    "    output {seltype} Out = {seldefault}\n"
+    "  )\n"
+    "  {{\n"
+    "{expr}"
+    "  }} /*{name}*/\n"
+    .format
+      (
+        name = name,
+        comptype = comptype,
+        seltype = seltype,
+        seldefault =
+            [
+                lambda : "{}(0)".format(seltype),
+                lambda : "0",
+            ][is_closure](),
+        expr =
+            [
+                "    Out = Cmp1 {op} Cmp2 ? Arg2 : Arg1;\n",
+                # conditional expressions don’t seem to be allowed on closures
+                "    if (Cmp1 {op} Cmp2)\n"
+                "      {{\n"
+                "        Out = Arg2;\n"
+                "      }}\n"
+                "    else\n"
+                "      {{\n"
+                "        Out = Arg1;\n"
+                "      }} /*if*/\n",
+            ][is_closure]
+            .format
+              (
+                op = ops[op],
+              ),
+      )
+  )
