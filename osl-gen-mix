@@ -1,0 +1,114 @@
+#!/usr/bin/python3
+#+
+# This script generates an Open Shading Language shader that returns
+# as its output a weighted mix of its inputs. Invoke it as follows:
+#
+#     osl-gen-mix --name=«name» --type=«type» --inputs=«inputs» [--weightout]
+#
+# where «name» is the name to give to the shader, «type» is the type
+# of the inputs and output, «inputs» is the positive integer number of
+# inputs that the shader will mix, and --weightout indicates that you
+# also want an output for the summed input weights, for chaining multiple
+# mixers together.
+#
+# «type» can be any type that OSL allows the requisite arithmetic operations on,
+# e.g. “float”, “color”, “point”. It can also be “closure color” to create
+# a mix shader.
+#
+# Copyright 2016 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
+#-
+
+import sys
+import getopt
+
+opts, args = getopt.getopt \
+  (
+    sys.argv[1:],
+    "",
+    ["inputs=", "name=", "type=", "weightout"]
+  )
+weightout = False
+nr_inputs = None
+shader_name = None
+op_type = None
+for keyword, value in opts :
+    if keyword == "--inputs" :
+        nr_inputs = int(value)
+        assert nr_inputs > 1
+    elif keyword == "--name" :
+        shader_name = value
+    elif keyword == "--type" :
+        op_type = value
+    elif keyword == "--weightout" :
+        weightout = True
+    #end if
+#end for
+if nr_inputs == None or shader_name == None or op_type == None :
+    raise getopt.GetoptError("missing --inputs, --name or --type value")
+#end if
+is_closure = op_type.startswith("closure")
+
+arg_default = \
+    [
+        "{type}(0)",
+        "0",
+    ][is_closure] \
+    .format \
+      (
+        type = op_type
+      )
+sys.stdout.write \
+  (
+    "shader {name}\n"
+    "  (\n"
+    "{input_args}"
+    "    output {type} Output = {arg_default}"
+    "{weightout_arg}\n"
+    "  )\n"
+    "  {{\n"
+    "    {decl_weight}Weight = {sum_weights};\n"
+    "    Output = ({sum_inputs}) {divide_by_weight};\n"
+    "  }} /*{name}*/\n"
+    .format
+      (
+        name = shader_name,
+        type = op_type,
+        input_args =
+            "".join
+              (
+                "    {type} Input{i} = {arg_default},\n"
+                "    float Weight{i} = 0,\n"
+                .format
+                  (
+                    i = i + 1,
+                    type = op_type,
+                    arg_default = arg_default,
+                  )
+                for i in range(nr_inputs)
+              ),
+        arg_default = arg_default,
+        weightout_arg =
+            [
+                "",
+                ",\n    output float Weight = 0",
+            ][weightout],
+        decl_weight =
+            [
+                "float ",
+                "",
+            ][weightout],
+        sum_weights = " + ".join("Weight{i}".format(i = i + 1) for i in range(nr_inputs)),
+        sum_inputs =
+            " + ".join
+              (
+                "Input{i} * Weight{i}".format(i = i + 1) for i in range(nr_inputs)
+              ),
+        divide_by_weight =
+            [
+                "/ Weight",
+                "* (1 / Weight)",
+                  # OSL doesn’t allow division of closure by anything, only multiplication
+            ][is_closure],
+      )
+  )
