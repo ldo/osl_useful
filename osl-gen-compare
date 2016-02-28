@@ -6,6 +6,12 @@
 #
 #     osl-gen-compare --comptype=«comptype» --seltype=«seltype» --name=«name» «op»
 #
+# where «comptype» is the type for the inputs to be compared, and
+# «seltype» is the type of the inputs to be selected from, as well
+# as the type of the output. «name» is the name to give the shader,
+# and «op» is the comparison to perform, one of the codes “eq”, “ge”,
+# “gt”, “le”, “lt” or “ne”.
+#
 # Copyright 2016 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
 #-

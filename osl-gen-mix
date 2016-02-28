@@ -6,9 +6,9 @@
 #     osl-gen-mix --name=«name» --type=«type» --inputs=«inputs» [--weightout]
 #
 # where «name» is the name to give to the shader, «type» is the type
-# of the inputs and output, «inputs» is the positive integer number of
-# inputs that the shader will mix, and --weightout indicates that you
-# also want an output for the summed input weights, for chaining multiple
+# of the inputs and output, «inputs» is the integer number of inputs that
+# the shader will mix (must be last least 2), and --weightout indicates that
+# you also want an output for the summed input weights, for chaining multiple
 # mixers together.
 #
 # «type» can be any type that OSL allows the requisite arithmetic operations on,
