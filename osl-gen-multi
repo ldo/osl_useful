@@ -1,0 +1,144 @@
+#!/usr/bin/python3
+#+
+# This script generates an Open Shading Language shader that performs
+# some cascaded arithmetic or comparison operation across multiple operands.
+# Invoke it as follows:
+#
+#     osl-gen-multi --name=«name» --type=«type» --inputs=«inputs» «op»
+#
+# where «name» is the name to give to the shader, «type» is the type
+# of the inputs and output, «inputs» is the integer number of inputs that
+# the shader will operate on (must be last least 2), and «op» is the
+# operation to perform, one of
+#
+#     add -- add the inputs together
+#     mul -- multiply the inputs together
+#     min -- output the minimum of the inputs
+#     max -- output the maximum of the inputs
+#
+# Copyright 2016 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
+#-
+
+import sys
+import getopt
+
+ops = \
+    {
+        "add" : {"op" : "+", "inline" : True},
+        "max" : {"op" : ">", "inline" : False},
+        "min" : {"op" : "<", "inline" : False},
+        "mul" : {"op" : "*", "inline" : True},
+    }
+
+opts, args = getopt.getopt \
+  (
+    sys.argv[1:],
+    "",
+    ["inputs=", "name=", "type="]
+  )
+nr_inputs = None
+shader_name = None
+op_type = None
+for keyword, value in opts :
+    if keyword == "--inputs" :
+        nr_inputs = int(value)
+        assert nr_inputs > 1
+    elif keyword == "--name" :
+        shader_name = value
+    elif keyword == "--type" :
+        op_type = value
+    #end if
+#end for
+if nr_inputs == None or shader_name == None or op_type == None :
+    raise getopt.GetoptError("missing --inputs, --name or --type value")
+#end if
+if len(args) != 1 :
+    raise getopt.GetoptError("need exactly one arg, the arithmetic/comparison operation to perform")
+#end if
+op = args[0]
+if op not in ops :
+    raise getopt.GetoptError("op not one of {}".format(",".join(k for k in ops)))
+#end if
+
+arg_default = "{type}(0)".format(type = op_type)
+op_params = ops[op]
+if op_params["inline"] :
+    accum_inputs = \
+        "    Output = {accum};\n" \
+        .format \
+          (
+            accum =
+                " {op} ".format(op = op_params["op"]).join
+                  (
+                    "Input{i}".format(i = i + 1) for i in range(nr_inputs)
+                  ),
+          )
+else :
+    if nr_inputs > 2 :
+        accum_inputs = \
+            [
+                "{type} temp = Input1 {op} Input2 ? Input1 : Input2"
+                .format
+                  (
+                    op = op_params["op"],
+                    type = op_type,
+                  )
+            ]
+        for i in range(3, nr_inputs) :
+            accum_inputs.append \
+              (
+                "temp = temp {op} Input{i} ? temp : Input{i}"
+                .format
+                  (
+                    op = op_params["op"],
+                    i = i,
+                  )
+              )
+        #end for
+        accum_inputs.append \
+          (
+            "Output = temp {op} Input{i} ? temp : Input{i}"
+            .format
+              (
+                op = op_params["op"],
+                i = nr_inputs,
+              )
+          )
+        accum_inputs = "".join("   " + s + ";\n" for s in accum_inputs)
+    else :
+        accum_inputs = \
+            "    Output = Input1 {op} Input2 ? Input1 : Input2;\n" \
+            .format(op = op_params["op"])
+    #end if
+#end if
+sys.stdout.write \
+  (
+    "shader {name}\n"
+    "  (\n"
+    "{input_args}"
+    "    output {type} Output = {arg_default}\n"
+    "  )\n"
+    "  {{\n"
+    "{accum_inputs}"
+    "  }} /*{name}*/\n"
+    .format
+      (
+        name = shader_name,
+        type = op_type,
+        input_args =
+            "".join
+              (
+                "    {type} Input{i} = {arg_default},\n"
+                .format
+                  (
+                    i = i + 1,
+                    type = op_type,
+                    arg_default = arg_default,
+                  )
+                for i in range(nr_inputs)
+              ),
+        arg_default = arg_default,
+        accum_inputs = accum_inputs,
+      )
+  )
