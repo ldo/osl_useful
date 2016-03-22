@@ -1,0 +1,11 @@
+shader scale_coords
+  (
+    point In = P,
+    float Scale = 1.0,
+    output point Out = P
+  )
+  /* simpler alternative to Blender’s Vector-Mapping node
+    that only does uniform scaling. */
+  {
+    Out = In * Scale;
+  } /*scale_coords*/
