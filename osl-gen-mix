@@ -78,7 +78,7 @@ sys.stdout.write \
             "".join
               (
                 "    {type} Input{i} = {arg_default},\n"
-                "    float Weight{i} = 0,\n"
+                "    float Weight{i} = 1,\n"
                 .format
                   (
                     i = i + 1,
