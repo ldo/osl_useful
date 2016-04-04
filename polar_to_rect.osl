@@ -1,0 +1,9 @@
+shader polar_to_rect
+  (
+    point In = point(1, 0, 0),
+    output point Out = point(1, 0, 0)
+  )
+  /* converts (r, theta, phi) to (x, y, z) coordinates. */
+  {
+    Out = point(cos(In[1]) * cos(In[2]), sin(In[1]) * cos(In[2]), sin(In[2])) * In[0];
+  } /*polar_to_rect*/

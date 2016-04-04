@@ -109,6 +109,23 @@ Prewritten Scripts
     Unlike that, this one takes both its X- and Y- inputs into account, and returns
     an angle that can cover the full circle.
 
+* `polar_to_rect.osl`
+
+    Interprets its input point as (*r*, *theta*, *phi*) polar coordinates (angles
+    *theta* and *phi* being in radians), and returns the output as converted
+    (*x*, *y*, *z*) Cartesian coordinates.
+
+    This can be used for 3D or 2D coordinates; for 2D, leave the input *phi* as
+    zero and the output *z* will be zero and can be ignored.
+
+* `rect_to_polar.osl`
+
+    Converts its input (*x*, *y*, *z*) Cartesian coordinates to (*r*, *theta*, *phi*)
+    polar coordinates as its output.
+
+    This can be used for 3D or 2D coordinates; for 2D, leave the input *z* as
+    zero and the output *phi* will be zero and can be ignored.
+
 * `scale_coords.osl`
 
     This is a simpler alternative to Cycles’ “Vector Mapping” node. This just does
@@ -116,4 +133,4 @@ Prewritten Scripts
     can be computed from other values.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2016 April 1
+2016 April 4
