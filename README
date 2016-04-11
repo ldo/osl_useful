@@ -100,6 +100,41 @@ be most of the types recognized by OSL, such as `float`, `point`, `color`, often
 
     which computes the sum of 5 input float values.
 
+* `osl-gen-select`
+
+    generates a node that selects from one of its inputs based on an input
+    integer within a specified range. The selection type may be any of the
+    usual OSL types, including “closure color”. You can specify a default
+    for the selector value if the actual value is outside the valid range.
+
+    For example, the command
+
+        ./osl-gen-select --seltype=closure\ color --name=select4_shader 1 4
+
+    generates a shader node script like this
+
+        shader select4_shader
+          (
+            int Sel = 0,
+            closure color In1 = 0,
+            closure color In2 = 0,
+            closure color In3 = 0,
+            closure color In4 = 0,
+            output closure color Out = 0
+          )
+          {
+            if (Sel == 1)
+                Out = In1;
+            else if (Sel == 2)
+                Out = In2;
+            else if (Sel == 3)
+                Out = In3;
+            else if (Sel == 4)
+                Out = In4;
+          } /*select4_shader*/
+
+    which selects from 4 different input shaders according to the Sel value.
+
 Prewritten Scripts
 ==================
 
@@ -118,6 +153,12 @@ Prewritten Scripts
     This can be used for 3D or 2D coordinates; for 2D, leave the input *phi* as
     zero and the output *z* will be zero and can be ignored.
 
+* `rand_int.osl`
+
+    Generates a pseudorandom uniformly-distributed integer over a specified
+    range. The output depends only on the integer parts of the input coordinate
+    and time values; you can get a different granularity simply by scaling these.
+
 * `rect_to_polar.osl`
 
     Converts its input (*x*, *y*, *z*) Cartesian coordinates to (*r*, *theta*, *phi*)
@@ -133,4 +174,4 @@ Prewritten Scripts
     can be computed from other values.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2016 April 4
+2016 April 11

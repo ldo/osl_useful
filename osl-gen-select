@@ -1,0 +1,127 @@
+#!/usr/bin/python3
+#+
+# This script generates an Open Shading Language shader that returns
+# as its output a copy of one of its inputs, depending on the value
+# of another integer input. Invoke it as follows:
+#
+#     osl-gen-select [--default=«default»] --seltype=«seltype» --name=«name» «lo» «hi»
+#
+# where «seltype» is the type of the inputs to be selected from, as well
+# as the type of the output. «name» is the name to give the shader,
+# and «lo» and «hi» are the integer lower and upper bounds of the selection.
+# «default» is the optional default value to use for the selector if it is
+# not set or is out of range.
+#
+# The generated shader will have («hi» - «lo» + 1) inputs of type
+# «seltype».
+#
+# Copyright 2016 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
+#-
+
+import sys
+import getopt
+
+opts, args = getopt.getopt \
+  (
+    sys.argv[1:],
+    "",
+    ["default=", "name=", "seltype="]
+  )
+seldefault = None
+seltype = None
+name = None
+for keyword, value in opts :
+    if keyword == "--default" :
+        seldefault = int(value)
+    elif keyword == "--name" :
+        name = value
+    elif keyword == "--seltype" :
+        seltype = value
+    #end if
+#end for
+if name == None or seltype == None :
+    raise getopt.GetoptError("missing --name or --seltype value")
+#end if
+if len(args) != 2 :
+    raise getopt.GetoptError("need exactly two args, the low and high bounds")
+#end if
+range_lo = int(args[0])
+range_hi = int(args[1])
+if range_hi < range_lo :
+    raise getopt.GetoptError("empty range [{} .. {}]".format(range_lo, range_hi))
+#end if
+if seldefault != None :
+    if seldefault < range_lo or seldefault > range_hi :
+        raise getopt.GetoptError("default {} not in range [{} .. {}]".format(seldefault, range_lo, range_hi))
+    #end if
+#end if
+is_closure = seltype.startswith("closure")
+arg_default = \
+    [
+        lambda : "{}(0)".format(seltype),
+        lambda : "0",
+    ][is_closure]()
+body = ""
+first = True
+for sel in range(range_lo, range_hi + 1) :
+    body += "    "
+    if not first :
+        body += "else "
+    #end if
+    body += \
+        (
+            "if (Sel == {sel})\n"
+            "        Out = In{idx};\n"
+            .format
+              (
+                sel = sel,
+                idx = sel - range_lo + 1,
+              )
+        )
+    first = False
+#end sel
+
+sys.stdout.write \
+  (
+    "shader {name}\n"
+    "  (\n"
+    "    int Sel = {seldefault},\n"
+    "{sel_args}"
+    "    output {type} Out = {default}\n"
+    "  )\n"
+    "  {{\n"
+    "{body}{body_default}"
+    "  }} /*{name}*/\n"
+    .format
+      (
+        name = name,
+        seldefault = (0, seldefault)[seldefault != None],
+        type = seltype,
+        default = arg_default,
+        sel_args =
+            "".join
+              (
+                "    {type} In{i} = {default},\n"
+                .format
+                  (
+                    type = seltype,
+                    i = i + 1,
+                    default = arg_default,
+                  )
+                for i in range(range_hi - range_lo + 1)
+              ),
+        body = body,
+        body_default =
+            [
+                lambda : "",
+                lambda :
+                    "    else\n"
+                    "        Out = In{i};\n"
+                    .format
+                      (
+                        i = seldefault - range_lo + 1,
+                      ),
+            ][seldefault != None](),
+      )
+  )

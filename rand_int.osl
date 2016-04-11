@@ -1,0 +1,16 @@
+shader rand_int
+  (
+    point Coord = P,
+    float Time = 0,
+    int Lo = 0,
+    int Hi = 1,
+    output int Val = 0
+  )
+  /* returns a pseudorandom uniformly-distributed integer in the range [Lo .. Hi],
+    which depends on the integer parts of the components of Coord and Time. To get a
+    different granularity of distribution, simply apply appropriate scaling to Coord
+    and Time. */
+  {
+    float x = noise("cell", Coord, Time);
+    Val = (int)round(x * (Hi - Lo) + Lo);
+  } /*rand_int*/
