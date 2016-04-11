@@ -100,6 +100,11 @@ be most of the types recognized by OSL, such as `float`, `point`, `color`, often
 
     which computes the sum of 5 input float values.
 
+* `osl-gen-panel`
+
+    generates a node that can be used to render a panel of multicoloured
+    lights or an array of windows on a highrise building.
+
 * `osl-gen-select`
 
     generates a node that selects from one of its inputs based on an input
