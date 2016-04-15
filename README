@@ -105,6 +105,11 @@ be most of the types recognized by OSL, such as `float`, `point`, `color`, often
     generates a node that can be used to render a panel of multicoloured
     lights or an array of windows on a highrise building.
 
+* `osl-gen-rand-pick`
+
+    generates a node that randomly picks from its inputs based on assigned
+    relative probability weights.
+
 * `osl-gen-select`
 
     generates a node that selects from one of its inputs based on an input
