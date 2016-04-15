@@ -1,0 +1,9 @@
+shader pi
+  (
+    float Factor = 1.0,
+    output float Val = M_PI
+  )
+  /* returns the specified multiple of π. */
+  {
+    Val = Factor * M_PI;
+  } /*pi*/

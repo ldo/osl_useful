@@ -154,6 +154,10 @@ Prewritten Scripts
     Unlike that, this one takes both its X- and Y- inputs into account, and returns
     an angle that can cover the full circle.
 
+* `pi.osl`
+
+    Returns the specified multiple of pi.
+
 * `polar_to_rect.osl`
 
     Interprets its input point as (*r*, *theta*, *phi*) polar coordinates (angles
