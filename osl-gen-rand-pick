@@ -4,16 +4,18 @@
 # one of its inputs, randomly-chosen according to relative probability
 # weights. Invoke it as follows:
 #
-#     osl-gen-rand-pick --axis=«axis» --name=«name» --type=«type» --inputs=«inputs»
+#     osl-gen-rand-pick [--axis=«axis»] --name=«name» --type=«type» --inputs=«inputs»
 #
-# where «axis» is 0, 1 or 2 to indicate which of the 3 available axes of cell
-# noise to pick from (to avoid correlations between different nodes using the same
-# random seed), «name» is the name to give to the shader, «type» is the type
-# of the inputs and output, and «inputs» is the integer number of inputs that
-# the shader will pick from (must be last least 2).
+# where «axis» is 0, 1 or 2 to indicate which of the 3 available axes
+# of cell noise to pick from, to avoid correlations between different
+# nodes using the same random seed (defaults to 0 if omitted), «name»
+# is the name to give to the shader, «type» is the type of the inputs
+# and output, and «inputs» is the integer number of inputs that the
+# shader will pick from (must be last least 2).
 #
-# «type» can be just about any OSL type, e.g. “float”, “color”, “point”.
-# It can also be “closure color” to create a random-picker shader.
+# «type» can be just about any OSL type, e.g. “float”, “color”,
+# “point”.  It can also be “closure color” to create a random-picker
+# shader.
 #
 # Copyright 2016 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
@@ -28,7 +30,7 @@ opts, args = getopt.getopt \
     "",
     ["axis=", "inputs=", "name=", "type="]
   )
-axis = None
+axis = 0
 nr_inputs = None
 shader_name = None
 op_type = None
@@ -45,7 +47,7 @@ for keyword, value in opts :
         op_type = value
     #end if
 #end for
-if axis == None or nr_inputs == None or shader_name == None or op_type == None :
+if nr_inputs == None or shader_name == None or op_type == None :
     raise getopt.GetoptError("missing --axis, --inputs, --name or --type value")
 #end if
 is_closure = op_type.startswith("closure")
