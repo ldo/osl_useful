@@ -148,6 +148,11 @@ be most of the types recognized by OSL, such as `float`, `point`, `color`, often
 Prewritten Scripts
 ==================
 
+* `amplify.osl`
+
+    Multiplies a shader output by a given factor. If the factor is greater than 1,
+    this amplifies the shader; if less than 1, it attenuates it.
+
 * `atan2.osl`
 
     This is an alternative to the “atan” function in Cycles’s built-in “Math” node.
@@ -188,4 +193,4 @@ Prewritten Scripts
     can be computed from other values.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2016 April 11
+2017 September 27
