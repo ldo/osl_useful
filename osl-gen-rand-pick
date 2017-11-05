@@ -17,7 +17,7 @@
 #       about any OSL type, e.g. “float”, “color”, “point”.  It can
 #       also be “closure color” to create a random-picker shader.
 #     * «inputs» is the integer number of inputs that the shader will
-#       pick from (must be last least 2).
+#       pick from (must be least 2).
 #
 # Copyright 2016-2017 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.

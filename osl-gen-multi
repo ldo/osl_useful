@@ -8,7 +8,7 @@
 #
 # where «name» is the name to give to the shader, «type» is the type
 # of the inputs and output, «inputs» is the integer number of inputs that
-# the shader will operate on (must be last least 2), and «op» is the
+# the shader will operate on (must be least 2), and «op» is the
 # operation to perform, one of
 #
 #     add -- add the inputs together
