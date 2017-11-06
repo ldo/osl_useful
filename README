@@ -100,6 +100,12 @@ be most of the types recognized by OSL, such as `float`, `point`, `color`, often
 
     which computes the sum of 5 input float values.
 
+* `osl-gen-ramp`
+
+    generates a piecewise-linear (ramp) mapping from an input float
+    value to an output float value. The mapping is divided up into
+    linear segments interpolating between specified control points.
+
 * `osl-gen-panel`
 
     generates a node that can be used to render a panel of multicoloured
@@ -193,4 +199,4 @@ Prewritten Scripts
     can be computed from other values.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2017 September 27
+2017 November 6
