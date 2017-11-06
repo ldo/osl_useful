@@ -21,7 +21,7 @@ opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["inputs=", "name=", "segments="]
+    ["name=", "segments="]
   )
 nr_segs = None
 shader_name = None
