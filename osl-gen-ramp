@@ -69,7 +69,7 @@ sys.stdout.write \
                             "incond" :
                                 (
                                     lambda : "",
-                                    lambda : " /* must be ≤ In%d */" % (i + 1),
+                                    lambda : " /* must be < In%d */" % (i + 1),
                                 )[i < nr_segs](),
                             "default" : i / nr_segs,
                         }
