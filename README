@@ -116,6 +116,14 @@ be most of the types recognized by OSL, such as `float`, `point`, `color`, often
     generates a node that randomly picks from its inputs based on assigned
     relative probability weights.
 
+* `osl-gen-rescale`
+
+    generates a node that applies a scalar linear transformation of its
+    input. That is, the input (which can be of any valid OSL type) has
+    a midpoint value (of the same type) subtracted from it, the result
+    is multiplied by a real value, and then the midpoint value is added
+    back to give the output.
+
 * `osl-gen-select`
 
     generates a node that selects from one of its inputs based on an input
@@ -199,4 +207,4 @@ Prewritten Scripts
     can be computed from other values.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2017 November 6
+2018 March 8
