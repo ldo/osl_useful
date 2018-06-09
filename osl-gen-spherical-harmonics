@@ -12,7 +12,9 @@
 #
 # The resulting shader will have (2l + 1) input arguments to
 # specify the weighting of the corresponding harmonics when
-# summing to make the output.
+# summing to make the output. The output will consist of only
+# the real part of the sum of the harmonics, with negative
+# values clamped to zero.
 #
 # Example use: this shader could be used to module the emission
 # intensity of a point light. Instead of loading an IES light
