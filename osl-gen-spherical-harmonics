@@ -36,28 +36,22 @@ import getopt
 harmonics_defs = \
     (
         ( # l = 0
-            ((1, 2, 1, 1), 0, (1,), (1,)),
+            ((1, 2, 1, 1), (1,), (1,)),
         ),
         ( # l = 1
-            ((1, 2, 3, 2), -1, (0, 1), (1,)),
-            ((1, 2, 3, 1), 0, (1,), (0, 1)),
-            ((-1, 2, 3, 2), 1, (0, 1), (1,)),
+            ((1, 2, 3, 1), (1,), (0, 1)),
+            ((1, 2, 3, 2), (0, 1), (1,)),
         ),
         ( # l = 2
-            ((1, 4, 15, 2), -2, (0, 0, 1), (1,)),
-            ((1, 2, 15, 2), -1, (0, 1), (0, 1)),
-            ((1, 4, 5, 1), 0, (1,), (-1, 0, 3)),
-            ((- 1, 2, 15, 2), 1, (0, 1), (0, 1)),
-            ((1, 4, 15, 2), 2, (0, 0, 1), (1,)),
+            ((1, 4, 5, 1), (1,), (-1, 0, 3)),
+            ((1, 2, 15, 2), (0, 1), (0, 1)),
+            ((1, 4, 15, 2), (0, 0, 1), (1,)),
         ),
         ( # l = 3
-            ((1, 8, 35, 1), -3, (0, 0, 0, 1), (1,)),
-            ((1, 4, 105, 2), -2, (0, 0, 1), (0, 1)),
-            ((1, 8, 21, 1), -1, (0, 1), (-1, 0, 5)),
-            ((1, 4, 7, 1), 0, (1,), (0, -3, 0, 5)),
-            ((- 1, 8, 21, 1), 1, (0, 1), (-1, 0, 5)),
-            ((1, 4, 105, 2), 2, (0, 0, 1), (0, 1)),
-            ((- 1, 8, 35, 1), 3, (0, 0, 0, 1), (1,)),
+            ((1, 4, 7, 1), (1,), (0, -3, 0, 5)),
+            ((1, 8, 21, 1), (0, 1), (-1, 0, 5)),
+            ((1, 4, 105, 2), (0, 0, 1), (0, 1)),
+            ((1, 8, 35, 1), (0, 0, 0, 1), (1,)),
         ),
         # could add more
     )
@@ -144,56 +138,62 @@ if order >= len(harmonics_defs) :
 #end if
 
 terms = []
-for m, (coeff_parts, exp_coeff, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
-    factors = [arg_name(m - order)]
-    factors.append \
-      (
-        format_number
-          (
-                (coeff_parts[0] / coeff_parts[1])
-            *
-                math.sqrt(coeff_parts[2] / (coeff_parts[3] * math.pi))
-          )
-      )
-    if exp_coeff != 0 :
+for m, (coeff_parts, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
+    for negate in ((False,), (False, True))[m != 0] :
+        negate_coeff = not negate and m & 1 != 0
+        if negate :
+            m = - m
+        #end if
+        factors = [arg_name(m)]
         factors.append \
           (
-            "cos(%s * phi)" % format_number(exp_coeff)
+            format_number
+              (
+                    (coeff_parts[0] * (1, -1)[negate_coeff] / coeff_parts[1])
+                *
+                    math.sqrt(coeff_parts[2] / (coeff_parts[3] * math.pi))
+              )
           )
-    #end if
-    for poly, var in \
-        (
-            (sinpoly, "sin_theta"),
-            (cospoly, "cos_theta"),
-        ) \
-    :
-        if poly != (1,) :
-            subterms = []
-            for i in range(len(poly)) :
-                subterm = make_term(var, i, poly[i])
-                if len(subterm[1]) != 0 :
-                    subterms.append(subterm)
-                #end if
-            #end for
-            if len(subterms) > 1 or subterms[0][0] :
-                lparen = "("
-                rparen = ")"
-            else :
-                lparen = rparen = ""
-            #end if
-            if len(subterms) > 1 :
-                subterms = " ".join \
-                  (
-                    ("+ ", "- ")[s[0]] + s[1]
-                    for s in subterms
-                  )
-            else :
-                subterms = ("", "- ")[subterms[0][0]] + subterms[0][1]
-            #end if
-            factors.append(lparen + "".join(subterms) + rparen)
+        if m != 0 :
+            factors.append \
+              (
+                "cos(%s * phi)" % format_number(abs(m))
+              )
         #end if
+        for poly, var in \
+            (
+                (sinpoly, "sin_theta"),
+                (cospoly, "cos_theta"),
+            ) \
+        :
+            if poly != (1,) :
+                subterms = []
+                for i in range(len(poly)) :
+                    subterm = make_term(var, i, poly[i])
+                    if len(subterm[1]) != 0 :
+                        subterms.append(subterm)
+                    #end if
+                #end for
+                if len(subterms) > 1 or subterms[0][0] :
+                    lparen = "("
+                    rparen = ")"
+                else :
+                    lparen = rparen = ""
+                #end if
+                if len(subterms) > 1 :
+                    subterms = " ".join \
+                      (
+                        ("+ ", "- ")[s[0]] + s[1]
+                        for s in subterms
+                      )
+                else :
+                    subterms = ("", "- ")[subterms[0][0]] + subterms[0][1]
+                #end if
+                factors.append(lparen + "".join(subterms) + rparen)
+            #end if
+        #end for
+        terms.append(" * ".join(factors))
     #end for
-    terms.append(" * ".join(factors))
 #end for
 
 sys.stdout.write \
