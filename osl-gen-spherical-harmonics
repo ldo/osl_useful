@@ -1,0 +1,225 @@
+#!/usr/bin/python3
+#+
+# This script generates an Open Shading Language shader that
+# produces as its output the specified mixture of spherical
+# harmonics in the given direction. Invoke it as follows:
+#
+#     osl-gen-spherical-harmonics --name=«name» --order=«order»
+#
+# where «name» is the name to give to the shader, and «order»
+# is the “l” value as per this table
+# <https://en.wikipedia.org/wiki/Table_of_spherical_harmonics>.
+#
+# The resulting shader will have (2l + 1) input arguments to
+# specify the weighting of the corresponding harmonics when
+# summing to make the output.
+#
+# Example use: this shader could be used to module the emission
+# intensity of a point light. Instead of loading an IES light
+# definition (support for which has been added to Blender as of
+# post-2.79b), you can make up your own programmatic light
+# intensity distribution function out of an arbitrary mixture
+# of some number of spherical harmonics.
+#
+# Copyright 2018 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
+#-
+
+import sys
+import math
+import getopt
+
+#+
+# Spherical harmonics table
+#-
+
+harmonics_defs = \
+    (
+        ( # l = 0
+            ((1, 2, 1, 1), 0, (1,), (1,)),
+        ),
+        ( # l = 1
+            ((1, 2, 3, 2), -1, (0, 1), (1,)),
+            ((1, 2, 3, 1), 0, (1,), (0, 1)),
+            ((-1, 2, 3, 2), 1, (0, 1), (1,)),
+        ),
+        ( # l = 2
+            ((1, 4, 15, 2), -2, (0, 0, 1), (1,)),
+            ((1, 2, 15, 2), -1, (0, 1), (0, 1)),
+            ((1, 4, 5, 1), 0, (1,), (-1, 0, 3)),
+            ((- 1, 2, 15, 2), 1, (0, 1), (0, 1)),
+            ((1, 4, 15, 2), 2, (0, 0, 1), (1,)),
+        ),
+        # could add more
+    )
+
+#+
+# Mainline
+#-
+
+def arg_name(m) :
+    "constructs the name to be used for the coefficient of the harmonic" \
+    " for the specified m-value."
+    return \
+        "W%s%d" % (("m", "", "p")[(m == 0) + 2 * (m > 0)], abs(m))
+#end arg_name
+
+def format_number(x) :
+    return \
+        "%%.%dg" % precision % x
+#end format_number
+
+def make_term(x, power, coeff) :
+    neg = coeff < 0
+    coeff = abs(coeff)
+    if coeff != 0 :
+        if coeff != 1 :
+            format_coeff = format_number(coeff) + " * "
+        elif power == 0 :
+            format_coeff = "1"
+        else :
+            format_coeff = ""
+        #end if
+        if power != 0 :
+            term = format_coeff + " * ".join([x] * power)
+        else :
+            term = format_coeff
+        #end if
+    else :
+        term = ""
+    #end if
+    return \
+        (neg, term)
+#end make_term
+
+opts, args = getopt.getopt \
+  (
+    sys.argv[1:],
+    "",
+    ["name=", "order=", "precision="]
+  )
+shader_name = None
+order = None
+precision = 7
+for keyword, value in opts :
+    if keyword == "--name" :
+        shader_name = value
+    elif keyword == "--order" :
+        try :
+            order = int(value)
+        except ValueError :
+            pass
+        #end try
+    elif keyword == "--precision" :
+        try :
+            precision = int(value)
+        except ValueError :
+            precision = -1
+        #end try
+        if precision < 0 :
+            raise getopt.GetoptError("bad --precision value")
+        #end if
+    #end if
+#end for
+if shader_name == None :
+    raise getopt.GetoptError("missing --name")
+#end if
+if order == None or order < 0 :
+    raise getopt.GetoptError("bad or missing --order value")
+#end if
+if order >= len(harmonics_defs) :
+    raise getopt.GetoptError \
+      (
+        "--order value too large, cannot handle more than %d" % (len(harmonics_defs) - 1)
+      )
+#end if
+
+terms = []
+for m, (coeff_parts, exp_coeff, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
+    factors = [arg_name(m - order)]
+    factors.append \
+      (
+        format_number
+          (
+                (coeff_parts[0] / coeff_parts[1])
+            *
+                math.sqrt(coeff_parts[2] / (coeff_parts[3] * math.pi))
+          )
+      )
+    if exp_coeff != 0 :
+        factors.append \
+          (
+            "cos(%s * phi)" % format_number(exp_coeff)
+          )
+    #end if
+    for poly, var in \
+        (
+            (sinpoly, "sin_theta"),
+            (cospoly, "cos_theta"),
+        ) \
+    :
+        if poly != (1,) :
+            subterms = []
+            for i in range(len(poly)) :
+                subterm = make_term(var, i, poly[i])
+                if len(subterm[1]) != 0 :
+                    subterms.append(subterm)
+                #end if
+            #end for
+            if len(subterms) > 1 or subterms[0][0] :
+                lparen = "("
+                rparen = ")"
+            else :
+                lparen = rparen = ""
+            #end if
+            if len(subterms) > 1 :
+                subterms = " ".join \
+                  (
+                    ("+ ", "- ")[s[0]] + s[1]
+                    for s in subterms
+                  )
+            else :
+                subterms = ("", "- ")[subterms[0][0]] + subterms[0][1]
+            #end if
+            factors.append(lparen + "".join(subterms) + rparen)
+        #end if
+    #end for
+    terms.append(" * ".join(factors))
+#end for
+
+sys.stdout.write \
+  (
+        "shader %(name)s\n"
+        "  (\n"
+        "%(weight_defs)s\n"
+        "    normal Direction = N,\n"
+        "    output float Result = 1\n"
+        "  )\n"
+        "  /* generated by osl-gen-spherical-harmonics. */\n"
+        "  {\n"
+        "    float len_xy = hypot(Direction[1], Direction[0]);\n"
+        "    float cos_theta = Direction[0] / len_xy;\n"
+        "    float sin_theta = Direction[1] / len_xy;\n"
+        "    float len_xyz = hypot(Direction[2], len_xy);\n"
+        "    float cos_phi = len_xy / len_xyz;\n"
+        "    float sin_phi = Direction[2] / len_xyz;\n"
+        "    float phi = atan2(Direction[2], len_xy);\n"
+        "    Result = max\n"
+        "      (\n"
+        "        %(extra_indent)s%(terms)s,\n"
+        "        0\n"
+        "      );\n"
+        "  } /*%(name)s*/\n"
+    %
+        {
+            "name" : shader_name,
+            "weight_defs" : "\n".join
+              (
+                "    float %s = 0," % arg_name(m)
+                for m in range(- order, order + 1)
+              ),
+            "extra_indent" : ("", "    ")[order > 0],
+            "terms" : "\n        +\n            ".join(terms),
+        }
+  )
+
