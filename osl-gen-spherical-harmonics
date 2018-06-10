@@ -162,12 +162,9 @@ if order >= len(harmonics_defs) :
 
 terms = []
 for m, (coeff_parts, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
-    for negate in ((False,), (False, True))[m != 0] :
-        negate_coeff = not negate and m & 1 != 0
-        if negate :
-            m = - m
-        #end if
-        factors = [arg_name(m)]
+    for negate_m in ((False,), (False, True))[m != 0] :
+        negate_coeff = not negate_m and m & 1 != 0
+        factors = [arg_name(m * (1, -1)[negate_m])]
         factors.append \
           (
             format_number
@@ -180,7 +177,7 @@ for m, (coeff_parts, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
         if m != 0 :
             factors.append \
               (
-                "cos(%s * phi)" % format_number(abs(m))
+                "cos(%sphi)" % (lambda : "", lambda : format_number(m) + " * ")[m != 1]()
               )
         #end if
         for poly, var in \
