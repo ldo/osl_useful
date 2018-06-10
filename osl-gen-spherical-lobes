@@ -68,8 +68,8 @@ if len(args) != 2 :
 #end if
 m = int(args[0])
 n = int(args[1])
-if m < 0 or n < 0 :
-    raise getopt.GetoptError("args must be non-negative")
+if m < 0 or n < 0 or m + n == 0 :
+    raise getopt.GetoptError("args must be non-negative and add up to 1 or more")
 #end if
 
 axial_terms = list \
@@ -80,24 +80,28 @@ axial_terms = list \
         {"i" : i + 1}
     for i in range(m)
   )
-if len(axial_terms) > 1 :
-    axial_terms = \
-        (
-            ["            (", "                " + axial_terms[0]]
-        +
-            list(chain
-              (
-                *list
+if len(axial_terms) > 0 :
+    if len(axial_terms) > 1 :
+        axial_terms = \
+            (
+                ["        (", "            " + axial_terms[0]]
+            +
+                list(chain
                   (
-                    ["            +", "                " + term]
-                    for term in axial_terms[1:]
-                  )
-              ))
-        +
-            ["            )"]
-        )
+                    *list
+                      (
+                        ["        +", "            " + term]
+                        for term in axial_terms[1:]
+                      )
+                  ))
+            +
+                ["        )"]
+            )
+    else :
+        axial_terms = ["        " + axial_terms[0]]
+    #end if
 else :
-    axial_terms = ["            " + axial_terms[0]]
+    axial_terms = []
 #end if
 radial_terms = list \
   (
@@ -107,33 +111,43 @@ radial_terms = list \
         {"i" : i + 1}
     for i in range(n)
   )
-if len(radial_terms) > 1 :
-    radial_terms = \
-        (
-            ["            (", "                " + radial_terms[0]]
-        +
-            list(chain
-              (
-                *list
+if len(radial_terms) > 0 :
+    if len(radial_terms) > 1 :
+        radial_terms = \
+            (
+                ["        (", "            " + radial_terms[0]]
+            +
+                list(chain
                   (
-                    ["            +", "                " + term]
-                    for term in radial_terms[1:]
-                  )
-              ))
-        +
-            ["            )"]
-        )
+                    *list
+                      (
+                        ["        +", "            " + term]
+                        for term in radial_terms[1:]
+                      )
+                  ))
+            +
+                ["        )"]
+            )
+    else :
+        radial_terms = ["        " + radial_terms[0]]
+    #end if
 else :
-    radial_terms = ["            " + radial_terms[0]]
+    radial_terms = []
 #end if
-all_terms = \
-    (
-        axial_terms
-    +
-        ["        *"]
-    +
-        radial_terms
-    )
+if len(axial_terms) == 0 :
+    all_terms = radial_terms
+elif len(radial_terms) == 0 :
+    all_terms = axial_terms
+else :
+    all_terms = \
+        (
+            list("    " + term for term in axial_terms)
+        +
+            ["        *"]
+        +
+            list("    " + term for term in radial_terms)
+        )
+#end if
 if clamp_positive :
     result_expr = \
         (
@@ -142,7 +156,7 @@ if clamp_positive :
         +
             "\n".join
               (
-                "    " + line for line in all_terms
+                ("", "    ")[len(all_terms) > 1] + line for line in all_terms
               )
         +
             ",\n            0\n"
