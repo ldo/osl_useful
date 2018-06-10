@@ -4,11 +4,20 @@
 # produces as its output the specified mixture of spherical
 # harmonics in the given direction. Invoke it as follows:
 #
-#     osl-gen-spherical-harmonics --name=«name» «order»
+#     osl-gen-spherical-harmonics --name=«name» [--use=«use»] «order»
 #
 # where «name» is the name to give to the shader, and «order»
 # is the “l” value as per this table
 # <https://en.wikipedia.org/wiki/Table_of_spherical_harmonics>.
+#
+# The «use» value indicates how to convert the complex-valued
+# exp(i * phi) factor to a real value. The options are
+#    * “real” (default)
+#        -- just take the real part
+#    * “phase”
+#        -- add a phase argument that is used to rotate the
+#           value in the complex plane before taking the real
+#           part.
 #
 # The resulting shader will have (2l + 1) input arguments to
 # specify the weighting of the corresponding harmonics when
@@ -29,6 +38,7 @@
 
 import sys
 import math
+import enum
 import getopt
 
 #+
@@ -86,12 +96,25 @@ harmonics_defs = \
 # Mainline
 #-
 
-def arg_name(m) :
+class USE(str, enum.Enum) :
+    "how to convert complex-valued factors to reals."
+    REAL = "real" # just take real part
+    PHASE = "phase" # apply a variable phase rotation before taking real part
+#end USE
+
+def amp_arg_name(m) :
     "constructs the name to be used for the coefficient of the harmonic" \
-    " for the specified m-value."
+    " amplitude for the specified m-value."
     return \
         "W%s%d" % (("m", "", "p")[(m == 0) + 2 * (m > 0)], abs(m))
-#end arg_name
+#end amp_arg_name
+
+def phase_arg_name(m) :
+    "constructs the name to be used for the coefficient of the harmonic" \
+    " phase for the specified m-value."
+    return \
+        "P%s%d" % (("m", "", "p")[(m == 0) + 2 * (m > 0)], abs(m))
+#end phase_arg_name
 
 def format_number(x) :
     return \
@@ -125,10 +148,11 @@ opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["name=", "precision="]
+    ["name=", "precision=", "use="]
   )
 shader_name = None
 precision = 7
+use_component = USE.REAL
 for keyword, value in opts :
     if keyword == "--name" :
         shader_name = value
@@ -141,6 +165,17 @@ for keyword, value in opts :
         if precision < 0 :
             raise getopt.GetoptError("bad --precision value")
         #end if
+    elif keyword == "--use" :
+        try :
+            use_component = USE(value)
+        except ValueError :
+            raise getopt.GetoptError \
+              (
+                    "invalid --use value %s; must be one of (%s)"
+                %
+                    (repr(value), ", ".join(repr(s.value) for s in USE))
+              )
+        #end try
     #end if
 #end for
 if shader_name == None :
@@ -164,7 +199,7 @@ terms = []
 for m, (coeff_parts, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
     for negate_m in ((False,), (False, True))[m != 0] :
         negate_coeff = not negate_m and m & 1 != 0
-        factors = [arg_name(m * (1, -1)[negate_m])]
+        factors = [amp_arg_name(m * (1, -1)[negate_m])]
         factors.append \
           (
             format_number
@@ -175,9 +210,20 @@ for m, (coeff_parts, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
               )
           )
         if m != 0 :
+            if use_component == USE.PHASE :
+                factor = \
+                    (
+                            "(cos(%(phase)s) * cos(%%(x)sphi)"
+                            " - sin(%(phase)s) * sin(%%(x)sphi))"
+                        %
+                            {"phase" : "%s * 2 * M_PI" % phase_arg_name(m * (1, -1)[negate_m])}
+                    )
+            else :
+                factor = "cos(%(x)sphi)"
+            #end if
             factors.append \
               (
-                "cos(%sphi)" % (lambda : "", lambda : format_number(m) + " * ")[m != 1]()
+                factor % {"x" : (lambda : "", lambda : format_number(m) + " * ")[m != 1]()}
               )
         #end if
         for poly, var in \
@@ -215,6 +261,13 @@ for m, (coeff_parts, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
         terms.append(" * ".join(factors))
     #end for
 #end for
+weight_defs = []
+for m in range(- order, order + 1) :
+    weight_defs.append("    float %s = 0," % amp_arg_name(m))
+    if use_component == USE.PHASE and m != 0 :
+        weight_defs.append("    float %s = 0," % phase_arg_name(m))
+    #end if
+#end for
 
 sys.stdout.write \
   (
@@ -240,11 +293,7 @@ sys.stdout.write \
     %
         {
             "name" : shader_name,
-            "weight_defs" : "\n".join
-              (
-                "    float %s = 0," % arg_name(m)
-                for m in range(- order, order + 1)
-              ),
+            "weight_defs" : "\n".join(weight_defs),
             "extra_indent" : ("", "    ")[order > 0],
             "terms" : "\n        +\n            ".join(terms),
         }
