@@ -218,6 +218,11 @@ Prewritten Scripts
     Unlike that, this one takes both its X- and Y- inputs into account, and returns
     an angle that can cover the full circle.
 
+* `convert_angles.osl`
+
+    This node converts between angles expressed as degrees, radians and fractions
+    of a circle.
+
 * `pi.osl`
 
     Returns the specified multiple of pi.
@@ -244,6 +249,12 @@ Prewritten Scripts
 
     This can be used for 3D or 2D coordinates; for 2D, leave the input *z* as
     zero and the output *phi* will be zero and can be ignored.
+
+* `rotate_coords.osl`
+
+    This is a simpler alternative to Cycles’ “Vector Mapping” node. This just does
+    rotation of a vector by a given angle about a given axis. Also the axis
+    and angle are node inputs, and so can be computed from other values.
 
 * `scale_coords.osl`
 

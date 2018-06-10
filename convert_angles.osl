@@ -1,0 +1,19 @@
+#define DEG (M_PI / 180)
+#define CIRCLE (2 * M_PI)
+
+shader convert_angles
+  (
+    float Degrees_in = 0,
+    float Radians_in = 0,
+    float Circles_in = 0,
+    output float Degrees_out = 0,
+    output float Radians_out = 0,
+    output float Circles_out = 0,
+  )
+  /* converts angles between various units. */
+  {
+    float angle = Degrees_in * DEG + Radians_in + Circles_in * CIRCLE;
+    Degrees_out = angle / DEG;
+    Radians_out = angle;
+    Circles_out = angle / CIRCLE;
+  } /*convert_angles*/
