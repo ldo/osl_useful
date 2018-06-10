@@ -8,10 +8,14 @@
 #
 # where «name» is the name to give to the shader, «m» is the
 # number of axial lobes, and «n» is the number of radial lobes.
-# Each component will be controlled by 3 parameters: the angle
-# to position the lobe, the intensity to give it, and the power
-# to which to raise the cosine term (which controls the sharpness
-# of the lobe).
+#
+# Each component will be controlled by 3 parameters: the angle at
+# which to position the centre of the lobe, the intensity to give it,
+# and the power to which to raise the cosine term (which controls the
+# sharpness of the peak).
+#
+# The sum of the axial lobes is multiplied by the sum of the
+# radial lobes to give the combined output.
 #
 # Copyright 2018 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
