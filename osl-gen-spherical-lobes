@@ -4,7 +4,7 @@
 # produces as its output the specified mixture of cosine
 # peak terms. Invoke it as follows:
 #
-#     osl-gen-spherical-lobes --name=«name» «m» «n»
+#     osl-gen-spherical-lobes --name=«name» [--clamp-positive] «m» «n»
 #
 # where «name» is the name to give to the shader, «m» is the
 # number of axial lobes, and «n» is the number of radial lobes.
@@ -22,7 +22,8 @@
 #-
 
 import sys
-import itertools
+from itertools import \
+    chain
 import getopt
 
 #+
@@ -38,12 +39,15 @@ opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["name=", "precision="]
+    ["clamp-positive", "name=", "precision="]
   )
 shader_name = None
 precision = 7
+clamp_positive = False
 for keyword, value in opts :
-    if keyword == "--name" :
+    if keyword == "--clamp-positive" :
+        clamp_positive = True
+    elif keyword == "--name" :
         shader_name = value
     elif keyword == "--precision" :
         try :
@@ -68,6 +72,86 @@ if m < 0 or n < 0 :
     raise getopt.GetoptError("args must be non-negative")
 #end if
 
+axial_terms = list \
+  (
+        "Intens_axial_%(i)d * pow((cos(theta - Angle_axial_%(i)d * M_PI) + 1) / 2,"
+        " Power_axial_%(i)d)"
+    %
+        {"i" : i + 1}
+    for i in range(m)
+  )
+if len(axial_terms) > 1 :
+    axial_terms = \
+        (
+            ["            (", "                " + axial_terms[0]]
+        +
+            list(chain
+              (
+                *list
+                  (
+                    ["            +", "                " + term]
+                    for term in axial_terms[1:]
+                  )
+              ))
+        +
+            ["            )"]
+        )
+else :
+    axial_terms = ["            " + axial_terms[0]]
+#end if
+radial_terms = list \
+  (
+        "Intens_radial_%(i)d * pow((cos(phi - Angle_radial_%(i)d * 2 * M_PI) + 1) / 2,"
+        " Power_radial_%(i)d)"
+    %
+        {"i" : i + 1}
+    for i in range(n)
+  )
+if len(radial_terms) > 1 :
+    radial_terms = \
+        (
+            ["            (", "                " + radial_terms[0]]
+        +
+            list(chain
+              (
+                *list
+                  (
+                    ["            +", "                " + term]
+                    for term in radial_terms[1:]
+                  )
+              ))
+        +
+            ["            )"]
+        )
+else :
+    radial_terms = ["            " + radial_terms[0]]
+#end if
+all_terms = \
+    (
+        axial_terms
+    +
+        ["        *"]
+    +
+        radial_terms
+    )
+if clamp_positive :
+    result_expr = \
+        (
+            "        max\n"
+            "          (\n"
+        +
+            "\n".join
+              (
+                "    " + line for line in all_terms
+              )
+        +
+            ",\n            0\n"
+            "          )"
+        )
+else :
+    result_expr = "\n".join(all_terms)
+#end if
+
 sys.stdout.write \
   (
         "shader %(name)s\n"
@@ -80,17 +164,8 @@ sys.stdout.write \
         "  {\n"
         "    float phi = atan2(Direction[1], Direction[0]);\n"
         "    float theta = atan2(hypot(Direction[1], Direction[0]), Direction[2]);\n"
-        "    Result = max\n"
-        "      (\n"
-        "            (\n"
-        "                %(axial_terms)s\n"
-        "            )\n"
-        "        *\n"
-        "            (\n"
-        "                %(radial_terms)s\n"
-        "            ),\n"
-        "        0\n"
-        "      );\n"
+        "    Result =\n"
+        "%(result)s;\n"
         "  } /*%(name)s*/\n"
     %
         {
@@ -102,7 +177,7 @@ sys.stdout.write \
                     lambda v : "    float %s = %s" % (v[0], format_number(v[1])) + ",",
                         list
                           (
-                            itertools.chain
+                            chain
                               (
                                 *list
                                   (
@@ -118,7 +193,7 @@ sys.stdout.write \
                     +
                         list
                           (
-                            itertools.chain
+                            chain
                               (
                                 *list
                                   (
@@ -133,23 +208,6 @@ sys.stdout.write \
                           )
                   )
               ),
-            "axial_terms" :
-                "\n            +\n                ".join
-                  (
-                        "Intens_axial_%(i)d * pow((cos(theta - Angle_axial_%(i)d * M_PI) + 1)"
-                        " / 2, Power_axial_%(i)d)"
-                    %
-                        {"i" : i + 1}
-                    for i in range(m)
-                  ),
-            "radial_terms" :
-                "\n            +\n                ".join
-                  (
-                        "Intens_radial_%(i)d * pow((cos(phi - Angle_radial_%(i)d * 2 * M_PI)"
-                        " + 1) / 2, Power_radial_%(i)d)"
-                    %
-                        {"i" : i + 1}
-                    for i in range(m)
-                  ),
+            "result" : result_expr,
         }
   )
