@@ -203,6 +203,23 @@ be most of the types recognized by OSL, such as `float`, `point`, `color`, often
 
     which has 3 weight inputs.
 
+* `osl-gen-spherical-lobes`
+
+    generates a node that outputs an angle-dependent function consisting
+    of a product of two sums of cosine terms. Each term defines a “lobe”
+    or “peak” in a particular orientation. One set of terms is a function
+    of the axial angle (symmetrical with respect to the positive Z-axis)
+    while the other set of terms is a function of the radial angle (varying
+    around the positive Z-axis). You specify the number of terms along
+    each dimension; they cannot both be zero.
+
+    For each term, you get an “intensity” input and a “power” input.
+    The intensity input controls the strength of that component, while
+    the “power” controls the sharpness of the peak.
+
+    The resulting intensity distribution could, for example, be
+    applied to a point lamp, to give directional emission effects.
+
 
 Prewritten Scripts
 ==================
@@ -263,4 +280,4 @@ Prewritten Scripts
     can be computed from other values.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2018 June 10
+2018 June 11
