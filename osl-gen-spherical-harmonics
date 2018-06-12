@@ -4,7 +4,7 @@
 # produces as its output the specified mixture of spherical
 # harmonics in the given direction. Invoke it as follows:
 #
-#     osl-gen-spherical-harmonics --name=«name» «order»
+#     osl-gen-spherical-harmonics --name=«name» [--clamp-positive] «order»
 #
 # where «name» is the name to give to the shader, and «order»
 # is the “l” value as per this table
@@ -132,12 +132,15 @@ opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["name=", "precision="]
+    ["clamp-positive", "name=", "precision="]
   )
 shader_name = None
+clamp_positive = False
 precision = 7
 for keyword, value in opts :
-    if keyword == "--name" :
+    if keyword == "--clamp-positive" :
+        clamp_positive = True
+    elif keyword == "--name" :
         shader_name = value
     elif keyword == "--precision" :
         try :
@@ -226,7 +229,16 @@ for m, (coeff_parts, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
                 factors.append(lparen + "".join(subterms) + rparen)
             #end if
         #end for
-        terms.append(" * ".join(factors))
+        if len(terms) != 0 :
+            if len(terms) == 1 :
+                terms[0] = "    " + terms[0]
+            #end if
+            terms.append("        +")
+            extra_indent = "    "
+        else :
+            extra_indent = ""
+        #end if
+        terms.append("        " + extra_indent + " * ".join(factors))
     #end for
 #end for
 weight_defs = []
@@ -236,6 +248,23 @@ for m in range(- order, order + 1) :
         weight_defs.append("    float %s = 0," % phase_arg_name(m))
     #end if
 #end for
+if clamp_positive :
+    result_expr = \
+        (
+            "        max\n"
+            "          (\n"
+        +
+            "\n".join
+              (
+                "    " + line for line in terms
+              )
+        +
+            ",\n            0\n"
+            "          )"
+        )
+else :
+    result_expr = "\n".join(terms)
+#end if
 
 sys.stdout.write \
   (
@@ -253,18 +282,14 @@ sys.stdout.write \
         "    float sin_theta = len_xy / len_xyz;\n"
         "    float cos_theta = Direction[2] / len_xyz;\n"
         "    float phi = atan2(Direction[1], Direction[0]);\n"
-        "    Result = max\n"
-        "      (\n"
-        "        %(extra_indent)s%(terms)s,\n"
-        "        0\n"
-        "      );\n"
+        "    Result =\n"
+        "%(result)s;\n"
         "  } /*%(name)s*/\n"
     %
         {
             "name" : shader_name,
             "weight_defs" : "\n".join(weight_defs),
-            "extra_indent" : ("", "    ")[order > 0],
-            "terms" : "\n        +\n            ".join(terms),
+            "result" : result_expr,
         }
   )
 
