@@ -42,7 +42,7 @@ if nr_segs == None or shader_name == None or op_type == None :
 #end if
 is_closure = op_type.startswith("closure")
 if is_closure :
-    raise getopt.GetoptError("OSL does not allow closure arithmetic")
+    raise getopt.GetoptError("OSL does not allow subtracting closures")
 #end if
 arg_default = ("%(type)s(0)", "0")[is_closure] % {"type" : op_type}
 
