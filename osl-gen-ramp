@@ -41,9 +41,9 @@ if nr_segs == None or shader_name == None or op_type == None :
     raise getopt.GetoptError("missing --name, --segments or --type value")
 #end if
 is_closure = op_type.startswith("closure")
-if is_closure :
-    raise getopt.GetoptError("OSL does not allow subtracting closures")
-#end if
+  # Need to do some workarounds for limitations on arithmetic with closures:
+  # no subtraction of closures and no division by anything, even though
+  # addition of closures and multiplication by numbers is OK
 arg_default = ("%(type)s(0)", "0")[is_closure] % {"type" : op_type}
 
 sys.stdout.write \
@@ -92,11 +92,21 @@ sys.stdout.write \
                 "".join
                   (
                     "    else if (In < In%(j)d)\n"
-                    "        Out = Out%(i)d + (Out%(j)d - Out%(i)d) * (In - In%(i)d) / (In%(j)d - In%(i)d);\n"
+                    "        Out = Out%(i)d + (Out%(j)d %(subterm)s) *"
+                        " %(openparen)s(In - In%(i)d) / (In%(j)d - In%(i)d)%(closeparen)s;\n"
                     %
                         {
                             "i" : i,
                             "j" : i + 1,
+                            "subterm" :
+                                    (
+                                        "- Out%(i)d",
+                                        "+ (-1 * Out%(i)d)",
+                                    )[is_closure]
+                                %
+                                    {"i" : i},
+                            "openparen" : ("", "(")[is_closure],
+                            "closeparen" : ("", ")")[is_closure],
                         }
                     for i in range(nr_segs)
                   ),
