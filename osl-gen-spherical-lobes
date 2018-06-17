@@ -105,8 +105,8 @@ else :
 #end if
 radial_terms = list \
   (
-        "Intens_radial_%(i)d * pow((cos(phi - Angle_radial_%(i)d * 2 * M_PI) + 1) / 2,"
-        " Power_radial_%(i)d)"
+        "Intens_radial_%(i)d * pow((cos(phi * Freq_radial_%(i)d - Angle_radial_%(i)d * 2 * M_PI)"
+        " + 1) / 2, Power_radial_%(i)d)"
     %
         {"i" : i + 1}
     for i in range(n)
@@ -214,6 +214,7 @@ sys.stdout.write \
                                   (
                                     [
                                         ("Angle_radial_%d" % (i + 1), i / n),
+                                        ("Freq_radial_%d" % (i + 1), 1),
                                         ("Intens_radial_%d" % (i + 1), 0),
                                         ("Power_radial_%d" % (i + 1), 1),
                                     ]
