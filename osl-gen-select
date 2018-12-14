@@ -4,11 +4,16 @@
 # as its output a copy of one of its inputs, depending on the value
 # of another integer input. Invoke it as follows:
 #
-#     osl-gen-select [--default=«default»] --seltype=«seltype» --name=«name» «lo» «hi»
+#     osl-gen-select [--default=«default»] [--ramp=«ramp_factor»] \
+#         --seltype=«seltype» --name=«name» «lo» «hi»
 #
 # where «seltype» is the type of the inputs to be selected from, as well
 # as the type of the output. «name» is the name to give the shader,
 # and «lo» and «hi» are the integer lower and upper bounds of the selection.
+# «ramp_factor» is an optional factor to control the width of a ramp to
+# transition between successive input values midway between corresponding
+# selector values; 0 causes a step switch. If the «ramp_factor» is specified,
+# then the selector value is a float, otherwise it is an integer.
 # «default» is the optional default value to use for the selector if it is
 # not set or is out of range.
 #
@@ -26,22 +31,34 @@ opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["default=", "name=", "seltype="]
+    ["decimals=", "default=", "name=", "ramp=", "seltype="]
   )
+decimals = 3
 seldefault = None
 seltype = None
 name = None
+ramp = None
 for keyword, value in opts :
-    if keyword == "--default" :
+    if keyword == "--decimals" :
+        decimals = int(value)
+    elif keyword == "--default" :
         seldefault = int(value)
     elif keyword == "--name" :
         name = value
+    elif keyword == "--ramp" :
+        ramp = float(value)
     elif keyword == "--seltype" :
         seltype = value
     #end if
 #end for
 if name == None or seltype == None :
     raise getopt.GetoptError("missing --name or --seltype value")
+#end if
+if decimals <= 0 :
+    raise getopt.GetoptError("--decimals value must be positive")
+#end if
+if ramp != None and (ramp < 0 or ramp > 1) :
+    raise getopt.GetoptError("--ramp value must be in [0, 1]")
 #end if
 if len(args) != 2 :
     raise getopt.GetoptError("need exactly two args, the low and high bounds")
@@ -69,16 +86,57 @@ for sel in range(range_lo, range_hi + 1) :
     if not first :
         body += "else "
     #end if
-    body += \
-        (
-                "if (Sel == %(sel)d)\n"
-                "        Out = In%(idx)d;\n"
-            %
-              {
-                "sel" : sel,
-                "idx" : sel - range_lo + 1,
-              }
-        )
+    if ramp != None :
+        if sel < range_hi :
+            body += \
+                (
+                        "if (Sel >= %(sel_prev_mid_high)s && Sel < %(sel_mid_low)s)\n"
+                        "        Out = In%(idx_cur)d;\n"
+                        "    else if (Sel >= %(sel_mid_low)s && Sel < %(sel_mid_high)s)\n"
+                        "        Out =\n"
+                        "                (In%(idx_next)d - In%(idx_cur)d) *"
+                            " (Sel - %(sel_mid_low)s) / %(delta)s\n"
+                        "            +\n"
+                        "                In%(idx_cur)d;\n"
+                    %
+                      {
+                        "sel_prev_mid_high" :
+                            (
+                                lambda : "%d" % sel,
+                                lambda : "%%%dg" % decimals % (sel - 0.5 + ramp / 2)
+                            )[sel > range_lo](),
+                        "sel_mid_low" : "%%%dg" % decimals % (sel + 0.5 - ramp / 2),
+                        "sel_mid_high" :  "%%%dg" % decimals % (sel + 0.5 + ramp / 2),
+                        "delta" : "%%%dg" % decimals % ramp,
+                        "idx_cur" : sel - range_lo + 1,
+                        "idx_next" : sel - range_lo + 2,
+                      }
+                )
+        else :
+            body += \
+                (
+                        "if (Sel > %(sel_prev_mid_high)s && Sel <= %(sel_cur)d)\n"
+                        "        Out = In%(idx_cur)d;\n"
+                    %
+                      {
+                        "sel_prev_mid_high" : "%%%dg" % decimals % (sel - 0.5 + ramp / 2),
+                        "sel_cur" : sel,
+                        "idx_cur" : sel - range_lo + 1,
+                      }
+                )
+        #end if
+    else :
+        body += \
+            (
+                    "if (Sel == %(sel_cur)d)\n"
+                    "        Out = In%(idx_cur)d;\n"
+                %
+                  {
+                    "sel_cur" : sel,
+                    "idx_cur" : sel - range_lo + 1,
+                  }
+            )
+    #end if
     first = False
 #end sel
 
@@ -86,7 +144,7 @@ sys.stdout.write \
   (
         "shader %(name)s\n"
         "  (\n"
-        "    int Sel = %(seldefault)d,\n"
+        "    %(indtype)s Sel = %(seldefault)d,\n"
         "%(sel_args)s"
         "    output %(type)s Out = %(default)s\n"
         "  )\n"
@@ -97,6 +155,7 @@ sys.stdout.write \
     %
       {
         "name" : name,
+        "indtype" : ("int", "float")[ramp != None],
         "seldefault" : (0, seldefault)[seldefault != None],
         "type" : seltype,
         "default" : arg_default,
