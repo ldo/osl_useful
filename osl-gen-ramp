@@ -95,7 +95,7 @@ if spline_type != None :
                         +
                             ["Out%d" % i for i in range(nr_segs + 1)]
                         +
-                            ["In%d" % nr_segs] * (end_repeat - 1)
+                            ["Out%d" % nr_segs] * (end_repeat - 1)
                       ),
             }
         )
