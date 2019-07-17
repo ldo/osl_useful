@@ -28,18 +28,24 @@ opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["name=", "segments=", "spline=", "type="]
+    ["end-repeat=", "name=", "segments=", "spline=", "type="]
   )
 nr_segs = None
+end_repeat = 1
 shader_name = None
 spline_type = None
 op_type = None
 for keyword, value in opts :
-    if keyword == "--segments" :
-        nr_segs = int(value)
-        assert nr_segs > 0
+    if keyword == "--end-repeat" :
+        end_repeat = int(value)
+        if end_repeat < 1 :
+            raise getopt.GetoptError("--end-repeat value must be ≥ 1")
+        #end if
     elif keyword == "--name" :
         shader_name = value
+    elif keyword == "--segments" :
+        nr_segs = int(value)
+        assert nr_segs > 0
     elif keyword == "--spline" :
         spline_type = value
     elif keyword == "--type" :
@@ -53,6 +59,9 @@ is_closure = op_type.startswith("closure")
   # Need to do some workarounds for limitations on arithmetic with closures:
   # no subtraction of closures and no division by anything, even though
   # addition of closures and multiplication by numbers is OK
+if end_repeat > 1 and spline_type == None :
+    raise getopt.GetoptError("--end-repeat only allowed with --spline")
+#end if
 if is_closure and spline_type != None :
     raise getopt.GetoptError("--spline not allowed with closures")
 #end if
@@ -69,9 +78,25 @@ if spline_type != None :
             {
                 "basis" : spline_type,
                 "type" : op_type,
-                "nrpts" : nr_segs + 1,
-                "xpts" : ", ".join("In%d" % i for i in range(nr_segs + 1)),
-                "ypts" : ", ".join("Out%d" % i for i in range(nr_segs + 1)),
+                "nrpts" : nr_segs + 1 + 2 * (end_repeat - 1),
+                "xpts" :
+                    ", ".join
+                      (
+                            ["In0"] * (end_repeat - 1)
+                        +
+                            ["In%d" % i for i in range(nr_segs + 1)]
+                        +
+                            ["In%d" % nr_segs] * (end_repeat - 1)
+                      ),
+                "ypts" :
+                    ", ".join
+                      (
+                            ["Out0"] * (end_repeat - 1)
+                        +
+                            ["Out%d" % i for i in range(nr_segs + 1)]
+                        +
+                            ["In%d" % nr_segs] * (end_repeat - 1)
+                      ),
             }
         )
 else :
