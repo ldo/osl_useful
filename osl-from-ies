@@ -1,0 +1,251 @@
+#!/usr/bin/python3
+#+
+# This script generates an OSL shader that outputs a directional
+# intensity function corresponding to a given light definition in
+# IESNA LM-63 format.
+#
+# The spec I am going by is the file iesna.txt available
+# from <https://seblagarde.wordpress.com/2014/11/05/ies-light-format-specification-and-reader/>.
+#-
+
+import sys
+import enum
+import os
+import re
+import getopt
+
+class IESLight :
+
+    class FormatError(Exception) :
+
+        def __init__(self, msg) :
+            self.msg = msg
+        #end __init__
+
+    #end FormatError
+
+    class GEOM(enum.IntEnum) :
+        VERTICAL_WHEN_AIMED_DOWN = 1
+        HORIZONTAL_WHEN_AIMED_DOWN_OR_ROTATED = 2
+        HORIZONTAL_WHEN_AIMED_DOWN_NOT_ROTATED = 3
+    #end GEOM
+
+    class UNITS(enum.IntEnum) :
+        FEET = 1
+        METRES = 2
+    #end UNITS
+
+    class PHOTOMETRIC(enum.IntEnum) :
+        # not well-defined, ignore?
+        TYPE_C = 1
+        TYPE_B = 2
+        TYPE_A = 3
+    #end PHOTOMETRIC
+
+    def __init__(self, **kwargs) :
+        self._attrs = tuple(sorted(kwargs.keys()))
+        for key in kwargs :
+            setattr(self, key, kwargs[key])
+        #end for
+        # more TBD?
+    #end __init__
+
+    def __repr__(self) :
+        return \
+            (
+                "%s(%s)"
+            %
+                (
+                    type(self).__name__,
+                    ", ".join("%s = %s" % (k, repr(getattr(self, k))) for k in self._attrs),
+                )
+            )
+    #end __repr__
+
+    @classmethod
+    def from_stream(celf, fl, ref_filename = None) :
+
+        next_line = None
+
+        def read_multi_line() :
+            # reads a line and any following continuation lines,
+            # returning it all as one line. Continuation is indicated
+            # by space at the end of the preceding line, or at the
+            # start of the one following.
+            nonlocal next_line
+            if next_line != None :
+                line = next_line
+            else :
+                line = fl.readline().rstrip("\n")
+            #end if
+            while True :
+                next_line = fl.readline()
+                if next_line == "" :
+                    break
+                next_line = next_line.rstrip("\n")
+                if not (line.endswith(" ") or next_line.startswith(" ")) :
+                    break
+                line += next_line
+            #end while
+            return \
+                line
+        #end read_multi_line
+
+        def read_items_line(cnv) :
+            line = read_multi_line()
+            raw_items = re.split("\\s+", line.strip())
+            if len(raw_items) != len(cnv) :
+                raise celf.FormatError \
+                  (
+                        "wrong nr items on line: expected %d, got %d: %s"
+                    %
+                        (len(cnv), len(raw_items), repr(line))
+                  )
+            #end if
+            items = []
+            for i in range(len(cnv)) :
+                try :
+                    items.append(cnv[i](raw_items[i]))
+                except ValueError :
+                    raise celf.FormatError \
+                      (
+                        "bad %s item[%d] on line: %s" % (cnv[i].__name__, i, repr(line))
+                      )
+                #end try
+            #end for
+            return \
+                items
+        #end read_items_line
+
+        def parse_tilt() :
+            geom_type = read_items_line([lambda x : celf.GEOM(int(x))])[0]
+            nr_tilts = read_items_line([int])[0]
+            tilt_angles = read_items_line([float] * nr_tilts)
+            tilt_factors = read_items_line([float] * nr_tilts)
+            return \
+                {
+                    "geom_type" : geom_type,
+                    "nr_tilts" : nr_tilts,
+                    "tilt_angles" : tilt_angles,
+                    "tilt_factors" : tilt_factors,
+                }
+        #end parse_tilt
+
+    #begin from_stream
+        tilt = None
+        while True :
+            line = fl.readline()
+            if line == "" : # EOF
+                raise celf.FormatError("“TILT=” line not found")
+            #end if
+            line = line.rstrip("\n")
+            # ignore everything prior to TILT= line for now
+            if line.startswith("TILT=") :
+                line = line[5:]
+                if line == "INCLUDE" :
+                    tilt = parse_tilt()
+                elif line != "NONE" :
+                    if ref_filename != None :
+                        tilt_filename = os.path.realpath \
+                          (
+                            os.path.join(os.path.split(ref_filename)[0], line)
+                          )
+                         # interpret relative path as relative to directory containing ref_filename
+                    else :
+                        tilt_filename = line
+                    #end if
+                    tilt = parse_tilt(open(tilt_filename, "rt"))
+                #end if
+                break
+            #end if
+        #end while
+        items = {"tilt" : tilt}
+        item_defs = \
+            (
+                ("nr_lamps", int),
+                ("lumens_per_lamp", float),
+                ("candela_multiplier", float),
+                ("nr_vert_angles", int),
+                ("nr_hor_angles", int),
+                ("photometric_type", lambda x : celf.PHOTOMETRIC(int(x))),
+                ("units_type", lambda x : celf.UNITS(int(x))),
+                ("width", float),
+                ("length", float),
+                ("height", float),
+            )
+        item_vals = read_items_line(tuple(i[1] for i in item_defs))
+        for i in range(len(item_defs)) :
+            items[item_defs[i][0]] = item_vals[i]
+        #end for
+        for valname in \
+            (
+                "nr_lamps",
+                "nr_vert_angles",
+                "nr_hor_angles",
+                # note width, length and height can be zero or negative
+            ) \
+        :
+            val = items[valname]
+            if val <= 0 :
+                raise celf.FormatError("%s must be positive: %.3g" % (valname, val))
+            #end if
+        #end for
+        if items["lumens_per_lamp"] == -1 :
+            items["lumens_per_lamp"] = None
+        elif items["lumens_per_lamp"] <= 0 :
+            raise celf.FormatError \
+              (
+                "invalid lumens per lamp; must be positive or -1: %.3g" % items["lumens_per_lamp"]
+              )
+        #end if
+        item_vals = read_items_line([float] * 3)
+        items["ballast_factor"] = item_vals[0]
+        items["ballast_photometric_factor"] = item_vals[1]
+        items["input_watts"] = item_vals[2]
+        vert_angles = read_items_line([float] * items["nr_vert_angles"])
+        hor_angles = read_items_line([float] * items["nr_hor_angles"])
+        items["vert_angles"] = vert_angles
+        items["hor_angles"] = hor_angles
+        candela_values = []
+        for i in range(items["nr_hor_angles"]) :
+            candela_values.append(read_items_line([float] * items["nr_vert_angles"]))
+        #end for
+        items["candela_values"] = candela_values
+        return \
+            celf(**items)
+    #end from_stream
+
+    @classmethod
+    def from_file(celf, filename) :
+        return \
+            celf.from_stream(open(filename, "rt"), filename)
+    #end from_file
+
+#end IESLight
+
+#+
+# Mainline
+#-
+
+opts, args = getopt.getopt \
+  (
+    sys.argv[1:],
+    "",
+    ["name="]
+  )
+shader_name = None
+for keyword, value in opts :
+    if keyword == "--name" :
+        shader_name = value
+    #end if
+#end for
+if shader_name == None :
+    raise getopt.GetoptError("missing --name")
+#end if
+if len(args) != 1 :
+    raise getopt.GetoptError("need exactly one arg, the input IES file name")
+#end if
+light_def = IESLight.from_file(args[0])
+sys.stderr.write("light_def = %s\n" % repr(light_def))
+
+# more TBD
