@@ -4,15 +4,23 @@
 # intensity function corresponding to a given light definition in
 # IESNA LM-63 format.
 #
-# The spec I am going by is the file iesna.txt available
-# from <https://seblagarde.wordpress.com/2014/11/05/ies-light-format-specification-and-reader/>.
+# Various online versions of spec:
+# <https://seblagarde.wordpress.com/2014/11/05/ies-light-format-specification-and-reader/>
+# <http://www.vuw.ac.nz/architecture-onlineteaching/tutorials/lightscape/extras/ies_standard_format.html>
 #-
 
 import sys
-import enum
 import os
+import math
+import enum
 import re
 import getopt
+
+DEG = math.pi / 180
+
+INTENSITY_CONV_FACTOR = 4 * math.pi / 177.83
+  # conversion factor taken from intern/cycles/util/util_ies.cpp in Blender source.
+  # See there for derivation of this value.
 
 class IESLight :
 
@@ -36,7 +44,6 @@ class IESLight :
     #end UNITS
 
     class PHOTOMETRIC(enum.IntEnum) :
-        # not well-defined, ignore?
         TYPE_C = 1
         TYPE_B = 2
         TYPE_A = 3
@@ -47,7 +54,6 @@ class IESLight :
         for key in kwargs :
             setattr(self, key, kwargs[key])
         #end for
-        # more TBD?
     #end __init__
 
     def __repr__(self) :
@@ -63,7 +69,12 @@ class IESLight :
     #end __repr__
 
     @classmethod
-    def from_stream(celf, fl, ref_filename = None) :
+    def from_stream(celf, fl, ref_filename = None, process_photometric = True) :
+        "parses IES data from the file-like object fl, and returns an IESLight" \
+        " object. ref_filename is used to interpret relative pathnames within" \
+        " the file, namely the TILT=«filename» option."
+
+        FormatError = celf.FormatError
 
         next_line = None
 
@@ -95,7 +106,7 @@ class IESLight :
             line = read_multi_line()
             raw_items = re.split("\\s+", line.strip())
             if len(raw_items) != len(cnv) :
-                raise celf.FormatError \
+                raise FormatError \
                   (
                         "wrong nr items on line: expected %d, got %d: %s"
                     %
@@ -107,7 +118,7 @@ class IESLight :
                 try :
                     items.append(cnv[i](raw_items[i]))
                 except ValueError :
-                    raise celf.FormatError \
+                    raise FormatError \
                       (
                         "bad %s item[%d] on line: %s" % (cnv[i].__name__, i, repr(line))
                       )
@@ -117,10 +128,18 @@ class IESLight :
                 items
         #end read_items_line
 
+        def ensure_increasing(items, what) :
+            if not all(items[i] < items[i + 1] for i in range(len(items) - 1)) :
+                raise FormatError("%s must all be increasing: %s" % (what, repr(items)))
+            #end if
+            return \
+                items
+        #end ensure_increasing
+
         def parse_tilt() :
             geom_type = read_items_line([lambda x : celf.GEOM(int(x))])[0]
             nr_tilts = read_items_line([int])[0]
-            tilt_angles = read_items_line([float] * nr_tilts)
+            tilt_angles = ensure_increasing(read_items_line([float] * nr_tilts), "tilt angles")
             tilt_factors = read_items_line([float] * nr_tilts)
             return \
                 {
@@ -131,12 +150,138 @@ class IESLight :
                 }
         #end parse_tilt
 
+        def expand_phototype_ab(vert_angles, hor_angles, candela_values) :
+            # following same processing that Cycles does.
+            # Args are lists which are updated in-place.
+
+            # transpose hor ↔ vert
+            temp = list \
+              (
+                list
+                  (
+                    candela_values[j][i]
+                    for j in range(len(hor_angles))
+                  )
+                for i in range(len(vert_angles))
+              )
+            candela_values[:] = temp
+            temp = vert_angles[:]
+            vert_angles[:] = hor_angles
+            hor_angles[:] = temp
+            nr_vert_angles = len(vert_angles)
+            nr_hor_angles = len(hor_angles)
+
+            # normalize/expand vert angles
+            if vert_angles[-1] != 90 :
+                raise FormatError \
+                  (
+                    "type-a/b vertical angles don’t end with 90: %.3f" % vert_angles[-1]
+                  )
+            #end if
+            if vert_angles[0] == 0 :
+                vert_angles[:] = \
+                    (
+                        list(90 - vert_angles[i] for i in range(nr_vert_angles - 1, 0, -1))
+                    +
+                        list(90 + θ for θ in vert_angles)
+                    )
+                for i in range(nr_hor_angles) :
+                    candela_values[i][:] = \
+                        (
+                            list(candela_values[i][j] for j in range(nr_vert_angles - 2, -1, -1))
+                        +
+                            candela_values[i]
+                        )
+                #end for
+            elif vert_angles[0] == -90 :
+                vert_angles[:] = list(90 + θ for θ in vert_angles)
+            #end if
+
+            # normalize/expand hor angles
+            if hor_angles[-1] != 90 :
+                raise FormatError \
+                  (
+                    "type-a/b horizontal angles don’t end with 90: %.3f" % hor_angles[-1]
+                  )
+            #end if
+            if hor_angles[0] == 0 :
+                hor_angles[:] = \
+                    (
+                        list(90 - hor_angles[i] for i in range(nr_hor_angles - 1, 0, -1))
+                    +
+                        list(90 + θ for θ in hor_angles)
+                    )
+                candela_values[:] = \
+                    (
+                        list(list(candela_values[i]) for i in range(nr_hor_angles - 1, 0, -1))
+                    +
+                        candela_values
+                    )
+            elif hor_angles[0] == -90 :
+                hor_angles[:] = list(90 + θ for θ in hor_angles)
+            #end if
+            hor_angles.append(360)
+            candela_values.append(list(candela_values[0]))
+        #end expand_phototype_ab
+
+        def expand_phototype_c(vert_angles, hor_angles, candela_values) :
+            # following same processing that Cycles does.
+            # Args are lists which are updated in-place.
+
+            # normalize vert angles
+            if vert_angles[0] == 90 and vert_angles[-1] == 180 :
+                vert_angles[:] = list(180 - θ for θ in vert_angles)
+            #end if
+            if vert_angles[0] != 0 :
+                raise FormatError \
+                  (
+                    "type-c vertical angles don’t start with 0: %.3f" % vert_angles[0]
+                  )
+            #end if
+
+            # normalize/expand hor angles
+            nr_hor_angles = len(hor_angles)
+            if hor_angles[0] == 90 :
+                hor_angles[:] = list(θ - 90 for θ in hor_angles)
+            #end if
+            if hor_angles[0] != 0 :
+                raise FormatError \
+                  (
+                    "type-c horizontal angles don’t start with 0: %.3f" % hor_angles[0]
+                  )
+            #end if
+            if nr_hor_angles == 1 :
+                hor_angles.append(360)
+                candela_values.append(list(candela_values[0]))
+            #end if
+            for hi_angle in (90, 180) :
+                if hor_angles[-1] == hi_angle :
+                    hor_angles.extend \
+                      (list(
+                        2 * hi_angle - hor_angles[i]
+                        for i in range(nr_hor_angles - 2, -1, -1)
+                      ))
+                    candela_values.extend \
+                      (list(
+                        list(candela_values[i])
+                        for i in range(nr_hor_angles - 2, -1, -1)
+                      ))
+                #end if
+            #end for
+            if hor_angles[-1] != 360 :
+                # put in missing 360° angle with same value as 0°; Cycles
+                # does additional check about angle step size, but why bother?
+                hor_angles.append(360)
+                candela_values.append(list(candela_values[0]))
+            #end if
+        #end expand_phototype_c
+
     #begin from_stream
         tilt = None
         while True :
             line = fl.readline()
             if line == "" : # EOF
-                raise celf.FormatError("“TILT=” line not found")
+                raise FormatError("“TILT=” line not found")
             #end if
             line = line.rstrip("\n")
             # ignore everything prior to TILT= line for now
@@ -187,38 +332,67 @@ class IESLight :
         :
             val = items[valname]
             if val <= 0 :
-                raise celf.FormatError("%s must be positive: %.3g" % (valname, val))
+                raise FormatError("%s must be positive: %d" % (valname, val))
             #end if
         #end for
         if items["lumens_per_lamp"] == -1 :
             items["lumens_per_lamp"] = None
         elif items["lumens_per_lamp"] <= 0 :
-            raise celf.FormatError \
+            raise FormatError \
               (
                 "invalid lumens per lamp; must be positive or -1: %.3g" % items["lumens_per_lamp"]
               )
         #end if
         item_vals = read_items_line([float] * 3)
-        items["ballast_factor"] = item_vals[0]
-        items["ballast_photometric_factor"] = item_vals[1]
+        ballast_factor = item_vals[0]
+        ballast_photometric_factor = item_vals[1]
         items["input_watts"] = item_vals[2]
-        vert_angles = read_items_line([float] * items["nr_vert_angles"])
-        hor_angles = read_items_line([float] * items["nr_hor_angles"])
+        vert_angles = ensure_increasing \
+          (
+            read_items_line([float] * items["nr_vert_angles"]),
+            "vertical angles"
+          )
+        hor_angles = ensure_increasing \
+          (
+            read_items_line([float] * items["nr_hor_angles"]),
+            "horizontal angles"
+          )
         items["vert_angles"] = vert_angles
         items["hor_angles"] = hor_angles
         candela_values = []
+        candela_multiplier = \
+            items["candela_multiplier"] * ballast_factor * ballast_photometric_factor
         for i in range(items["nr_hor_angles"]) :
-            candela_values.append(read_items_line([float] * items["nr_vert_angles"]))
+            candela_values.append \
+              (
+                list
+                  (
+                    x * candela_multiplier
+                    for x in read_items_line([float] * items["nr_vert_angles"])
+                  )
+              )
         #end for
         items["candela_values"] = candela_values
+        if process_photometric :
+            for valname in ("nr_vert_angles", "nr_hor_angles", "candela_multiplier") :
+                # nr vert/hor angles might be invalidated by transposition in type-A/B
+                # processing (below); candela_multiplier has been applied, so no longer needed
+                del items[valname]
+            #end for
+            {
+                celf.PHOTOMETRIC.TYPE_A : expand_phototype_ab,
+                celf.PHOTOMETRIC.TYPE_B : expand_phototype_ab,
+                celf.PHOTOMETRIC.TYPE_C : expand_phototype_c,
+            }[items["photometric_type"]](vert_angles, hor_angles, candela_values)
+        #end if
         return \
             celf(**items)
     #end from_stream
 
     @classmethod
-    def from_file(celf, filename) :
+    def from_file(celf, filename, process_photometric = True) :
         return \
-            celf.from_stream(open(filename, "rt"), filename)
+            celf.from_stream(open(filename, "rt"), filename, process_photometric)
     #end from_file
 
 #end IESLight
