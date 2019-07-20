@@ -292,4 +292,3 @@ sys.stdout.write \
             "result" : result_expr,
         }
   )
-
