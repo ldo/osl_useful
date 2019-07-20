@@ -557,14 +557,14 @@ sys.stdout.write \
             "interp_a" :
                 vert_interp
                   (
-                    "(i == 0 ? %(nr_hor_angles)s - 1 : i - 1)" % {"nr_hor_angles" : nr_hor_angles}
+                    "(i == 0 ? %(nr_hor_angles)s - 2 : i - 1)" % {"nr_hor_angles" : nr_hor_angles}
                   ),
             "interp_b" : vert_interp("i"),
             "interp_c" : vert_interp("i + 1"),
             "interp_d" :
                 vert_interp
                   (
-                    "(i + 2 == %(nr_hor_angles)s ? 1 : i - 2)" % {"nr_hor_angles" : nr_hor_angles}
+                    "(i + 2 == %(nr_hor_angles)s ? 1 : i + 2)" % {"nr_hor_angles" : nr_hor_angles}
                   ),
             "tiltinterp" : "", # TBD
             "interp_result" : cubic_interp("i_frac", "a", "b", "c", "d"),
