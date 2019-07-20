@@ -528,7 +528,7 @@ sys.stdout.write \
         "        ++j;\n"
         "      } /*while*/\n"
         "    --j;\n" # won’t be zero
-        "    j_frac = (theta - vert_angles[i]) / (vert_angles[j + 1] - vert_angles[j]);\n"
+        "    j_frac = (theta - vert_angles[j]) / (vert_angles[j + 1] - vert_angles[j]);\n"
         "\n"
         "    float a = %(interp_a)s;\n"
         "    float b = %(interp_b)s;\n"
