@@ -508,8 +508,6 @@ sys.stdout.write \
         "\n"
         "    float len_xy = hypot(Direction[1], Direction[0]);\n"
         "    float len_xyz = hypot(Direction[2], len_xy);\n"
-        "    float sin_theta = len_xy / len_xyz;\n"
-        "    float cos_theta = Direction[2] / len_xyz;\n"
         "    float theta = atan2(len_xy, Direction[2]);\n"
         "    float phi = atan2(Direction[1], Direction[0]);\n"
         "\n"
