@@ -81,7 +81,7 @@ class IESLight :
 
         def split_items(line) :
             return \
-                re.split("\\s+", line.strip())
+                re.split("[\\,\\s]+", line.strip())
         #end split_items
 
         def read_multi_line(nr_items) :
@@ -94,7 +94,7 @@ class IESLight :
                 if next_line == "" :
                     break
                 next_line = next_line.rstrip("\n")
-                line += next_line
+                line += " " + next_line
                 if len(split_items(line)) >= nr_items :
                     break
             #end while
