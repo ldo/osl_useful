@@ -79,38 +79,32 @@ class IESLight :
 
         FormatError = celf.FormatError
 
-        next_line = None
+        def split_items(line) :
+            return \
+                re.split("\\s+", line.strip())
+        #end split_items
 
-        def read_multi_line() :
-            # reads a line and any following continuation lines,
-            # returning it all as one line. Continuation is indicated
-            # by space at the end of the preceding line, or at the
-            # start of the one following.
-            # FIXME: looks like continuation is more like an automatic
-            # thing, which happens as long as the line(s) read so far
-            # have fewer items than expected.
-            nonlocal next_line
-            if next_line != None :
-                line = next_line
-            else :
-                line = fl.readline().rstrip("\n")
-            #end if
+        def read_multi_line(nr_items) :
+            # reads a line and any following continuation lines as necessary
+            # to make up the specified number of items, returning it all as
+            # one line.
+            line = ""
             while True :
                 next_line = fl.readline()
                 if next_line == "" :
                     break
                 next_line = next_line.rstrip("\n")
-                if not (line.endswith(" ") or next_line.startswith(" ")) :
-                    break
                 line += next_line
+                if len(split_items(line)) >= nr_items :
+                    break
             #end while
             return \
                 line
         #end read_multi_line
 
         def read_items_line(cnv) :
-            line = read_multi_line()
-            raw_items = re.split("\\s+", line.strip())
+            line = read_multi_line(len(cnv))
+            raw_items = split_items(line)
             if len(raw_items) != len(cnv) :
                 raise FormatError \
                   (
