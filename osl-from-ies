@@ -505,7 +505,7 @@ sys.stdout.write \
         "    float len_xyz = hypot(Direction[2], len_xy);\n"
         "    float theta = atan2(len_xy, - Direction[2]);\n"
           # positive-Z is down, same as Cycles
-        "    float phi = atan2(Direction[1], Direction[0]) + M_PI;\n"
+        "    float phi = atan2(Direction[0], Direction[1]) + M_PI;\n"
         "\n"
         "    int i, j;\n"
         "    float i_frac, j_frac;\n"
