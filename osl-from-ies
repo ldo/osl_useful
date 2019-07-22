@@ -515,18 +515,32 @@ sys.stdout.write \
         "    int i, j;\n"
         "    float i_frac, j_frac;\n"
         "    i = 0;\n"
-        "    while (hor_angles[i] < phi)\n"
+        "    while (i < %(nr_hor_angles)d && hor_angles[i] <= phi)\n"
         "      {\n"
         "        ++i;\n"
         "      } /*while*/\n"
-        "    --i;\n" # won’t be zero
+        "    if (i == %(nr_hor_angles)d)\n"
+        "      {\n"
+        "        i = 0;\n" # wrap around
+        "      }\n"
+        "    else\n"
+        "      {\n"
+        "        --i;\n" # won’t be zero
+        "      } /*if*/\n"
         "    i_frac = (phi - hor_angles[i]) / (hor_angles[i + 1] - hor_angles[i]);\n"
         "    j = 0;\n"
-        "    while (vert_angles[j] < theta)\n"
+        "    while (j < %(nr_vert_angles)d && vert_angles[j] <= theta)\n"
         "      {\n"
         "        ++j;\n"
         "      } /*while*/\n"
-        "    --j;\n" # won’t be zero
+        "    if (j == %(nr_vert_angles)d)\n"
+        "      {\n"
+        "        j = 0;\n" # wrap around
+        "      }\n"
+        "    else\n"
+        "      {\n"
+        "        --j;\n" # won’t be zero
+        "      } /*if*/\n"
         "    j_frac = (theta - vert_angles[j]) / (vert_angles[j + 1] - vert_angles[j]);\n"
         "\n"
         "    float a = %(interp_a)s;\n"
