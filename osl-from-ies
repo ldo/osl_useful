@@ -271,6 +271,7 @@ class IESLight :
             #end if
             for hi_angle in (90, 180) :
                 if hor_angles[-1] == hi_angle :
+                    nr_hor_angles = len(hor_angles)
                     hor_angles.extend \
                       (list(
                         2 * hi_angle - hor_angles[i]
