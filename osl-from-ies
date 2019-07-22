@@ -478,7 +478,7 @@ def vert_interp(i) :
             (
                 "(j == 0 ? 1 : j - 1)",
                 "j",
-                "j + 1",
+                "min(j + 1, %(n)d)" % {"n" : nr_vert_angles - 1},
                 "min(j + 2, %(n)d)" % {"n" : nr_vert_angles - 1},
             )
       )
@@ -530,13 +530,17 @@ sys.stdout.write \
         "      } /*while*/\n"
         "    if (j == %(nr_vert_angles)d)\n"
         "      {\n"
-        "        j = 0;\n" # wrap around
+        "        j = %(nr_vert_angles)d - 1;\n" # clamp
         "      }\n"
         "    else\n"
         "      {\n"
         "        --j;\n" # won’t be zero
         "      } /*if*/\n"
-        "    j_frac = (theta - vert_angles[j]) / (vert_angles[j + 1] - vert_angles[j]);\n"
+        "    j_frac =\n"
+        "        j >= %(nr_vert_angles)d - 1 ?\n"
+        "            0\n"
+        "        :\n"
+        "            (theta - vert_angles[j]) / (vert_angles[j + 1] - vert_angles[j]);\n"
         "\n"
         "    float a = %(interp_a)s;\n"
         "    float b = %(interp_b)s;\n"
