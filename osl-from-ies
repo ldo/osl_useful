@@ -477,7 +477,7 @@ num_format = "%%.%df" % nr_digits
 def vert_interp(i) :
     coeffs = list \
       (
-            "intensities[(%(i)s) * %(nr_vert_angles)s + %(j)s]"
+            "intensities[(%(i)s) * %(nr_vert_angles)d + %(j)s]"
         %
             {"i" : i, "j" : j, "nr_vert_angles" : nr_vert_angles}
         for j in
@@ -485,7 +485,7 @@ def vert_interp(i) :
                 "(j == 0 ? 1 : j - 1)",
                 "j",
                 "j + 1",
-                "min(j + 2, %(n)s)" % {"n" : nr_vert_angles},
+                "min(j + 2, %(n)d)" % {"n" : nr_vert_angles - 1},
             )
       )
     return \
@@ -572,14 +572,14 @@ sys.stdout.write \
             "interp_a" :
                 vert_interp
                   (
-                    "(i == 0 ? %(nr_hor_angles)s - 2 : i - 1)" % {"nr_hor_angles" : nr_hor_angles}
+                    "(i == 0 ? %(n)d : i - 1)" % {"n" : nr_hor_angles - 2}
                   ),
             "interp_b" : vert_interp("i"),
             "interp_c" : vert_interp("i + 1"),
             "interp_d" :
                 vert_interp
                   (
-                    "(i + 2 == %(nr_hor_angles)s ? 1 : i + 2)" % {"nr_hor_angles" : nr_hor_angles}
+                    "(i + 2 == %(nr_hor_angles)d ? 1 : i + 2)" % {"nr_hor_angles" : nr_hor_angles}
                   ),
             "tiltinterp" : "", # TBD
             "interp_result" : cubic_interp("i_frac", "a", "b", "c", "d"),
