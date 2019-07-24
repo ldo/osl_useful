@@ -461,10 +461,10 @@ if shader_name == None :
 if len(args) != 1 :
     raise getopt.GetoptError("need exactly one arg, the input IES file name")
 #end if
-light_def = IESLight.from_file(args[0])
-#sys.stderr.write("light_def = %s\n" % repr(light_def)) # debug
-nr_vert_angles = len(light_def.vert_angles)
-nr_hor_angles = len(light_def.hor_angles)
+lum = IESLight.from_file(args[0])
+#sys.stderr.write("lum = %s\n" % repr(lum)) # debug
+nr_vert_angles = len(lum.vert_angles)
+nr_hor_angles = len(lum.hor_angles)
 
 num_format = "%%.%df" % nr_digits
 
@@ -500,6 +500,7 @@ sys.stdout.write \
         "    float vert_angles[%(nr_vert_angles)d] = {%(vert_angles)s};\n"
         "    float hor_angles[%(nr_hor_angles)d] = {%(hor_angles)s};\n"
         "    float intensities[%(nr_intensities)d] = {%(intensities)s};\n"
+        "%(tiltdefs)s"
         "\n"
         "    float len_xy = hypot(Direction[1], Direction[0]);\n"
         "    float len_xyz = hypot(Direction[2], len_xy);\n"
@@ -541,6 +542,7 @@ sys.stdout.write \
         "            0\n"
         "        :\n"
         "            (theta - vert_angles[j]) / (vert_angles[j + 1] - vert_angles[j]);\n"
+        "%(tiltindex)s"
         "\n"
         "    float a = %(interp_a)s;\n"
         "    float b = %(interp_b)s;\n"
@@ -554,20 +556,77 @@ sys.stdout.write \
     %
         {
             "name" : shader_name,
-            "tiltarg" : "", # TBD
+            "tiltarg" :
+                (
+                    "",
+                    "    float Tilt = 0,\n",
+                )[lum.tilt != None],
             "nr_vert_angles" : nr_vert_angles,
-            "vert_angles" : ", ".join(num_format % (x * DEG) for x in light_def.vert_angles),
+            "vert_angles" : ", ".join(num_format % (x * DEG) for x in lum.vert_angles),
             "nr_hor_angles" : nr_hor_angles,
-            "hor_angles" : ", ".join(num_format % (x * DEG) for x in light_def.hor_angles),
+            "hor_angles" : ", ".join(num_format % (x * DEG) for x in lum.hor_angles),
             "nr_intensities" : nr_vert_angles * nr_hor_angles,
             "intensities" :
                 # note OSL only allows 1D arrays, no arrays of arrays
                 ", ".join
                   (
-                    num_format % (light_def.candela_values[i][j] * INTENSITY_CONV_FACTOR)
+                    num_format % (lum.candela_values[i][j] * INTENSITY_CONV_FACTOR)
                     for i in range(nr_hor_angles)
                     for j in range(nr_vert_angles)
                   ),
+            "tiltdefs" :
+                (
+                    lambda : "",
+                    lambda :
+                            "    float tilt_angles[%(nr_tilts)d] = {%(tilt_angles)s};\n"
+                            "    float tilt_factors[%(nr_tilts)d] = {%(tilt_factors)s};\n"
+                        %
+                            {
+                                "nr_tilts" : lum.tilt["nr_tilts"],
+                                "tilt_angles" :
+                                    ", ".join
+                                      (
+                                        num_format % (x * DEG)
+                                        for x in lum.tilt["tilt_angles"]
+                                      ),
+                                "tilt_factors" :
+                                    ", ".join
+                                      (
+                                        num_format % x
+                                        for x in lum.tilt["tilt_factors"]
+                                      ),
+                            },
+                )[lum.tilt != None](),
+            "tiltindex" :
+                (
+                    lambda : "",
+                    lambda :
+                            "    int k;\n"
+                            "    float k_frac;\n"
+                            "    k = 0;\n"
+                            "    while (k < %(nr_tilts)d && tilt_angles[k] <= Tilt)\n"
+                            "      {\n"
+                            "        ++k;\n"
+                            "      } /*while*/\n"
+                            "    if (k == %(nr_tilts)d)\n"
+                            "      {\n"
+                            "        k = %(nr_tilts)d - 1;\n" # clamp
+                            "      }\n"
+                            "    else if (k > 0)\n"
+                            "      {\n"
+                            "        --k;\n"
+                            "      } /*if*/\n"
+                            "    k_frac =\n"
+                            "        k >= %(nr_tilts)d - 1 ?\n"
+                            "            0\n"
+                            "        :\n"
+                            "            (Tilt - tilt_angles[k]) /"
+                                " (tilt_angles[k + 1] - tilt_angles[k]);\n"
+                            %
+                            {
+                                "nr_tilts" : lum.tilt["nr_tilts"],
+                            },
+                )[lum.tilt != None](),
             "interp_a" :
                 vert_interp
                   (
@@ -580,8 +639,30 @@ sys.stdout.write \
                   (
                     "(i + 2 == %(nr_hor_angles)d ? 1 : i + 2)" % {"nr_hor_angles" : nr_hor_angles}
                   ),
-            "tiltinterp" : "", # TBD
+            "tiltinterp" :
+                (
+                    lambda : "",
+                    lambda :
+                            "    float tilt_factor = %s;\n"
+                        %
+                            cubic_interp
+                              (
+                                "k_frac",
+                                "tilt_factors[max(k - 1, 0)]",
+                                "tilt_factors[k]",
+                                    "tilt_factors[min(k + 1, %(n)d)]"
+                                %
+                                    {"n" : lum.tilt["nr_tilts"] - 1},
+                                    "tilt_factors[min(k + 2, %(n)d)]"
+                                %
+                                    {"n" : lum.tilt["nr_tilts"] - 1},
+                              ),
+                )[lum.tilt != None](),
             "interp_result" : cubic_interp("i_frac", "a", "b", "c", "d"),
-            "tiltapply" : "", # TBD
+            "tiltapply" :
+                (
+                    "",
+                    " * tilt_factor",
+                )[lum.tilt != None],
         }
   )
