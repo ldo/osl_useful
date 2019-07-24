@@ -13,6 +13,13 @@ operand types, operation to perform, and name to give the shader. Operand types 
 be most of the types recognized by OSL, such as `float`, `point`, `color`, often even
 `closure color`.
 
+* `osl-from-ies`
+
+    takes as input a file containing a light definition in IESNA LM-63 format, and
+    generates an OSL shader that maps an input direction to the corresponding light intensity.
+    This tries to follow as closely as possible the behaviour of the Cycles “IES Texture”
+    node.
+
 * `osl-gen-compare`
 
     generates a comparison between two inputs, and uses the result of that comparison to
@@ -281,4 +288,4 @@ Prewritten Scripts
     can be computed from other values.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2019 July 12
+2019 July 24
