@@ -4,10 +4,13 @@
 # intensity function corresponding to a given light definition in
 # IESNA LM-63 (aka “IES”) format. Invoke it as follows:
 #
-#     osl-from-ies --name=«name» «ies-file-name»
+#     osl-from-ies --name=«name» [--encoding=«encoding»] «ies-file-name»
 #
-# where «name» is the name to give to the shader, and «ies-file-name»
-# is the name of the file containing the IES light definition.
+# where «name» is the name to give to the shader, «ies-file-name»
+# is the name of the file containing the IES light definition,
+# and «encoding» is the character encoding to use for reading the
+# IES file (defaults to UTF-8 if omitted).
+#
 # The OSL shader definition is written to standard output.
 #
 # Various online versions of spec:
@@ -406,9 +409,12 @@ class IESLight :
     #end from_stream
 
     @classmethod
-    def from_file(celf, filename, process_photometric = True) :
+    def from_file(celf, filename, encoding = "utf-8", process_photometric = True) :
         return \
-            celf.from_stream(open(filename, "rt"), filename, process_photometric)
+            celf.from_stream \
+              (
+                open(filename, "rt", encoding = encoding), filename, process_photometric
+              )
     #end from_file
 
 #end IESLight
@@ -448,16 +454,19 @@ def cubic_interp(x, a, b, c, d) :
 # Mainline
 #-
 
+encoding = "utf-8"
 nr_digits = 3
 opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["name="]
+    ["encoding=", "name="]
   )
 shader_name = None
 for keyword, value in opts :
-    if keyword == "--name" :
+    if keyword == "--encoding" :
+        encoding = value
+    elif keyword == "--name" :
         shader_name = value
     #end if
 #end for
@@ -467,7 +476,7 @@ if shader_name == None :
 if len(args) != 1 :
     raise getopt.GetoptError("need exactly one arg, the input IES file name")
 #end if
-lum = IESLight.from_file(args[0])
+lum = IESLight.from_file(args[0], encoding = encoding)
 #sys.stderr.write("lum = %s\n" % repr(lum)) # debug
 nr_vert_angles = len(lum.vert_angles)
 nr_hor_angles = len(lum.hor_angles)
