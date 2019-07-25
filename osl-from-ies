@@ -623,7 +623,7 @@ sys.stdout.write \
                             "        :\n"
                             "            (Tilt - tilt_angles[k]) /"
                                 " (tilt_angles[k + 1] - tilt_angles[k]);\n"
-                            %
+                        %
                             {
                                 "nr_tilts" : lum.tilt["nr_tilts"],
                             },
