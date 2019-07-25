@@ -2,7 +2,13 @@
 #+
 # This script generates an OSL shader that outputs a directional
 # intensity function corresponding to a given light definition in
-# IESNA LM-63 format.
+# IESNA LM-63 (aka “IES”) format. Invoke it as follows:
+#
+#     osl-from-ies --name=«name» «ies-file-name»
+#
+# where «name» is the name to give to the shader, and «ies-file-name»
+# is the name of the file containing the IES light definition.
+# The OSL shader definition is written to standard output.
 #
 # Various online versions of spec:
 # <https://seblagarde.wordpress.com/2014/11/05/ies-light-format-specification-and-reader/>
