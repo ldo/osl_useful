@@ -20,7 +20,7 @@
 # The generated shader will have («hi» - «lo» + 1) inputs of type
 # «seltype».
 #
-# Copyright 2016, 2018 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Copyright 2016-2020 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
 #-
 
@@ -94,8 +94,9 @@ for sel in range(range_lo, range_hi + 1) :
                         "        Out = In%(idx_cur)d;\n"
                         "    else if (Sel >= %(sel_mid_low)s && Sel < %(sel_mid_high)s)\n"
                         "        Out =\n"
-                        "                (In%(idx_next)d - In%(idx_cur)d) *"
-                            " (Sel - %(sel_mid_low)s) / %(delta)s\n"
+                        "                (In%(idx_next)d %(subterm_begin)sIn%(idx_cur)d"
+                            "%(subterm_end)s) *"
+                            " ((Sel - %(sel_mid_low)s) / %(delta)s)\n"
                         "            +\n"
                         "                In%(idx_cur)d;\n"
                     %
@@ -107,6 +108,8 @@ for sel in range(range_lo, range_hi + 1) :
                             )[sel > range_lo](),
                         "sel_mid_low" : "%%%dg" % decimals % (sel + 0.5 - ramp / 2),
                         "sel_mid_high" :  "%%%dg" % decimals % (sel + 0.5 + ramp / 2),
+                        "subterm_begin" : ("- ", "+ (-1 * ")[is_closure],
+                        "subterm_end" : ("", ")")[is_closure],
                         "delta" : "%%%dg" % decimals % ramp,
                         "idx_cur" : sel - range_lo + 1,
                         "idx_next" : sel - range_lo + 2,
