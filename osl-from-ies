@@ -17,7 +17,7 @@
 # <https://seblagarde.wordpress.com/2014/11/05/ies-light-format-specification-and-reader/>
 # <http://www.vuw.ac.nz/architecture-onlineteaching/tutorials/lightscape/extras/ies_standard_format.html>
 #
-# Copyright 2019 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Copyright 2019-2020 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
 #-
 
@@ -154,11 +154,21 @@ class IESLight :
                 conv
         #end enum_conv
 
-        def parse_tilt() :
+        def parse_tilt(new_fl = None) :
+            nonlocal fl
+            if new_fl != None :
+                save_fl = fl
+                fl = new_fl
+            else :
+                save_fl = None
+            #end if
             geom_type = read_items_line([enum_conv(celf.GEOM)])[0]
             nr_tilts = read_items_line([int])[0]
             tilt_angles = ensure_increasing(read_items_line([float] * nr_tilts), "tilt angles")
             tilt_factors = read_items_line([float] * nr_tilts)
+            if new_fl != None :
+                fl = save_fl
+            #end if
             return \
                 {
                     "geom_type" : geom_type,
