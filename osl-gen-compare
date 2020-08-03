@@ -74,31 +74,31 @@ sys.stdout.write \
         "%(expr)s"
         "  } /*%(name)s*/\n"
     %
-      {
-        "name" : name,
-        "comptype" : comptype,
-        "seltype" : seltype,
-        "seldefault" :
-            [
-                lambda : "%s(0)" % seltype,
-                lambda : "0",
-            ][is_closure](),
-        "expr" :
+        {
+            "name" : name,
+            "comptype" : comptype,
+            "seltype" : seltype,
+            "seldefault" :
                 [
-                    "    Out = Cmp1 %(op)s Cmp2 ? Arg2 : Arg1;\n",
-                    # conditional expressions don’t seem to be allowed on closures
-                    "    if (Cmp1 %(op)s Cmp2)\n"
-                    "      {\n"
-                    "        Out = Arg2;\n"
-                    "      }\n"
-                    "    else\n"
-                    "      {\n"
-                    "        Out = Arg1;\n"
-                    "      } /*if*/\n",
-                ][is_closure]
-            %
-              {
-                "op" : ops[op],
-              },
-      }
+                    lambda : "%s(0)" % seltype,
+                    lambda : "0",
+                ][is_closure](),
+            "expr" :
+                    [
+                        "    Out = Cmp1 %(op)s Cmp2 ? Arg2 : Arg1;\n",
+                        # conditional expressions don’t seem to be allowed on closures
+                        "    if (Cmp1 %(op)s Cmp2)\n"
+                        "      {\n"
+                        "        Out = Arg2;\n"
+                        "      }\n"
+                        "    else\n"
+                        "      {\n"
+                        "        Out = Arg1;\n"
+                        "      } /*if*/\n",
+                    ][is_closure]
+                %
+                    {
+                        "op" : ops[op],
+                    },
+        }
   )
