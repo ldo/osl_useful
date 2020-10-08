@@ -12,8 +12,7 @@ shader rotate_coords
     float wq = cos(Angle / 2);
     vector vq = sin(Angle / 2) * normalize(Axis);
   /* [vq, wq] is now the rotation quaternion */
-    vector v1 = cross(vq, In - Origin) + wq * (In - Origin);
-    float w1 = - dot(In - Origin, vq);
-    Out = cross(vq, v1) + wq * v1 + w1 * vq + Origin;
-  /* and wq * w1 - dot(vq, v1) should be zero */
+    vector v1 = cross(vq, In - Origin) + wq * (In - Origin) + vq;
+    float w1 = wq - dot(In - Origin, vq);
+    Out = cross(vq, v1) + wq * v1 - w1 * vq + Origin;
   } /*rotate_coords*/
