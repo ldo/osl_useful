@@ -226,7 +226,7 @@ for m, (coeff_parts, sinpoly, cospoly) in enumerate(harmonics_defs[order]) :
                 else :
                     subterms = ("", "- ")[subterms[0][0]] + subterms[0][1]
                 #end if
-                factors.append(lparen + "".join(subterms) + rparen)
+                factors.append(lparen + subterms + rparen)
             #end if
         #end for
         if len(terms) != 0 :
