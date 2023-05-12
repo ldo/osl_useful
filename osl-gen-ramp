@@ -2,52 +2,119 @@
 #+
 # This script generates an Open Shading Language shader that does a
 # mapping of an input value to an output value. The mapping can be
-# piecewise-linear, or it can be a spline curve. Invoke this script as
-# follows:
+# piecewise-linear, or it can be one of the types of spline curve
+# recognized by OSL. Invoke this script as follows:
 #
 #     osl-gen-ramp --name=«name» --segments=«segments» [--spline=«basis»] --type=«type»
 #
-# where «name» is the name to give to the shader, «segments» is 1 less
-# than the integer number of input/output value pairs that will be
-# specified, «basis» is the spline basis to use, and «type» is the
-# type of value to interpolate.
+# where «name» is the name to give to the shader, «segments» is the number
+# of curve segments, «basis» is the spline basis to use, and «type» is the
+# type of output value to interpolate.
 #
-# If «basis» is not specified, a piecewise-linear ramp is created;
-# «segments» must be at least 1 in this case. Various spline bases
-# impose further restrictions: check the OSL documentation for
-# details.
+# The shader function will take a float input parameter, and some
+# number of float “in” and the same number of «type» “out” knot
+# values. The input parameter will be mapped through the
+# spline-inverse function using the “in” knot values, and then through
+# the spline-function using the “out” knot values, to produce the
+# «type» shader output.
 #
-# Copyright 2017-2019 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# The number of knot values is a function of the number of curve segments
+# and the spline basis; check the OSL documentation for details.
+# For those spline functions that ignore some number of initial and
+# final knot values, these are omitted from the shader inputs.
+#
+# If «basis» is not specified, a piecewise-linear ramp is created.
+#
+# Copyright 2017-2023 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under CC-BY <http://creativecommons.org/licenses/by/4.0/>.
 #-
 
 import sys
+import enum
 import getopt
+
+class SPLINE(enum.Enum) :
+    "the recognized types of spline."
+    # (name, alt_name, knots_per_seg, extra_knots, ignore_first, ignore_last)
+    CONSTANT = ("constant", None, 1, 3, 1, 2)
+    LINEAR = ("linear", None, 1, 3, 1, 1)
+    BÉZIER = ("bezier", "bézier", 3, 1, 0, 0)
+    BSPLINE = ("bspline", "b-spline", 3, 1, 0, 0)
+    CATMULL_ROM = ("catmull-rom", "catmull_rom", 1, 3, 0, 0)
+    HERMITE = ("hermite", None, 2, 2, 0, 0)
+
+    @property
+    def canonical_name(self) :
+        "the name that OSL expects for this spline basis type."
+        return \
+            self.value[0]
+    #end canonical_name
+
+    @property
+    def knots_per_seg(self) :
+        "the number of knots that OSL expects per curve segment."
+        return \
+            self.value[2]
+    #end knots_per_seg
+
+    @property
+    def extra_knots(self) :
+        "the number of extra knot values that OSL expects," \
+        " independent of the number of curve segments."
+        return \
+            self.value[3]
+    #end extra_knots
+
+    @property
+    def ignore_first(self) :
+        "the number of initial knots that is ignored by the spline basis function."
+        return \
+            self.value[4]
+    #end ignore_first
+
+    @property
+    def ignore_last(self) :
+        "the number of final knots that is ignored by the spline basis function."
+        return \
+            self.value[5]
+    #end ignore_last
+
+#end SPLINE
+SPLINE.from_name = dict \
+  (
+    (n, v)
+    for v in SPLINE
+    for n in (v.value[0],) + ((), (v.value[1],))[v.value[1] != None]
+  )
+
+#+
+# Mainline
+#-
 
 opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["end-repeat=", "name=", "segments=", "spline=", "type="]
+    ["name=", "segments=", "spline=", "type="]
   )
 nr_segs = None
-end_repeat = 1
 shader_name = None
-spline_type = None
+spline_basis = None
 op_type = None
 for keyword, value in opts :
-    if keyword == "--end-repeat" :
-        end_repeat = int(value)
-        if end_repeat < 1 :
-            raise getopt.GetoptError("--end-repeat value must be ≥ 1")
-        #end if
-    elif keyword == "--name" :
+    if keyword == "--name" :
         shader_name = value
     elif keyword == "--segments" :
-        nr_segs = int(value)
-        assert nr_segs > 0
+        try :
+            nr_segs = int(value)
+        except ValueError :
+            nr_segs = None
+        #end try
+        if nr_segs == None or nr_segs <= 0 :
+            raise getopt.GetoptError("--segments value must be at least 1")
+        #end if
     elif keyword == "--spline" :
-        spline_type = value
+        spline_basis = value
     elif keyword == "--type" :
         op_type = value
     #end if
@@ -59,15 +126,34 @@ is_closure = op_type.startswith("closure")
   # Need to do some workarounds for limitations on arithmetic with closures:
   # no subtraction of closures and no division by anything, even though
   # addition of closures and multiplication by numbers is OK
-if end_repeat > 1 and spline_type == None :
-    raise getopt.GetoptError("--end-repeat only allowed with --spline")
-#end if
-if is_closure and spline_type != None :
+if is_closure and spline_basis != None :
     raise getopt.GetoptError("--spline not allowed with closures")
 #end if
 arg_default = ("%(type)s(0)", "0")[is_closure] % {"type" : op_type}
+if spline_basis != None :
+    spline_basis = spline_basis.lower()
+    if spline_basis not in SPLINE.from_name :
+        raise getopt.GetoptError \
+          (
+                "unrecognized spline type “%s”, must be one of %s"
+            %
+                (spline_basis, ", ".join(sorted(SPLINE.from_name.keys())))
+          )
+    #end if
+    spline_basis = SPLINE.from_name[spline_basis]
+#end if
 
-if spline_type != None :
+if spline_basis != None :
+    nr_points = \
+        (
+            nr_segs * spline_basis.knots_per_seg
+        +
+            spline_basis.extra_knots
+        -
+            spline_basis.ignore_first
+        -
+            spline_basis.ignore_last
+        )
     body = \
         (
             "    float xpts[%(nrpts)d] = {%(xpts)s};\n"
@@ -76,37 +162,38 @@ if spline_type != None :
             "    Out = spline(\"%(basis)s\", x, ypts);\n"
         %
             {
-                "basis" : spline_type,
+                "basis" : spline_basis.canonical_name,
                 "type" : op_type,
-                "nrpts" : nr_segs + 1 + 2 * (end_repeat - 1),
+                "nrpts" : nr_points + spline_basis.ignore_first + spline_basis.ignore_last,
                 "xpts" :
                     ", ".join
                       (
-                            ["In0"] * (end_repeat - 1)
+                            ["0.0"] * spline_basis.ignore_first
                         +
-                            ["In%d" % i for i in range(nr_segs + 1)]
+                            ["In%d" % i for i in range(nr_points)]
                         +
-                            ["In%d" % nr_segs] * (end_repeat - 1)
+                            ["0.0"] * spline_basis.ignore_last
                       ),
                 "ypts" :
                     ", ".join
                       (
-                            ["Out0"] * (end_repeat - 1)
+                            ["%s(0)" % op_type] * spline_basis.ignore_first
                         +
-                            ["Out%d" % i for i in range(nr_segs + 1)]
+                            ["Out%d" % i for i in range(nr_points)]
                         +
-                            ["Out%d" % nr_segs] * (end_repeat - 1)
+                            ["%s(0)" % op_type] * spline_basis.ignore_last
                       ),
             }
         )
 else :
+    nr_points = nr_segs + 1
     body = \
         (
                 "    if (In < In0)\n"
                 "        Out = Out0;\n"
                 "%(body_rest)s"
                 "    else\n"
-                "        Out = Out%(nr_segs)d;\n"
+                "        Out = Out%(nr_points)d;\n"
             %
                 {
                     "body_rest" :
@@ -131,7 +218,7 @@ else :
                                 }
                             for i in range(nr_segs)
                           ),
-                    "nr_segs" : nr_segs,
+                    "nr_points" : nr_points,
                 }
         )
 #end if
@@ -167,11 +254,11 @@ sys.stdout.write \
                                 (
                                     lambda : "",
                                     lambda : " /* must be < In%d */" % (i + 1),
-                                )[i < nr_segs](),
-                            "in_default" : i / nr_segs,
+                                )[i < nr_points - 1](),
+                            "in_default" : i / nr_points,
                             "out_default" : arg_default,
                         }
-                    for i in range(nr_segs + 1)
+                    for i in range(nr_points)
                   ),
             "body" : body,
         }
